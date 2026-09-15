@@ -41,6 +41,15 @@ export function inlineEditorScript(): string {
     }, "*");
   }
 
+  // The app needs to know when someone is typing in here, so it never replaces
+  // this document mid-word.
+  document.addEventListener("focusin", function (e) {
+    if (fieldOf(e.target)) parent.postMessage({ type: "sb:editing", active: true }, "*");
+  });
+  document.addEventListener("focusout", function (e) {
+    if (fieldOf(e.target)) parent.postMessage({ type: "sb:editing", active: false }, "*");
+  });
+
   document.addEventListener("input", function (e) {
     var field = fieldOf(e.target);
     if (field) report(field);

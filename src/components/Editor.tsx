@@ -90,6 +90,12 @@ export default function Editor() {
   const [selection, setSelection] = useState<SelectionState | null>(null);
   // Typing in the preview must not rebuild the document under the caret.
   const skipPreviewRebuild = useRef(false);
+  // True while a field inside the frame holds the caret. Counting renders to
+  // skip "just one" rebuild was too delicate — a rebuild slipped through under
+  // fast typing and swallowed the rest of the word. This can't slip.
+  const editingInFrame = useRef(false);
+  const rebuildWhenDone = useRef(false);
+  const [rebuildTick, setRebuildTick] = useState(0);
   const [previewDoc, setPreviewDoc] = useState("");
   const dialogOpen = useDialogOpen();
 
@@ -161,6 +167,13 @@ export default function Editor() {
             ),
           })),
         }));
+      } else if (data?.type === "sb:editing") {
+        editingInFrame.current = !!data.active;
+        // Anything that wanted a rebuild while they were typing happens now.
+        if (!data.active && rebuildWhenDone.current) {
+          rebuildWhenDone.current = false;
+          setRebuildTick((tick) => tick + 1);
+        }
       } else if (data?.type === "sb:sel") {
         if (!data.active) {
           setSelection(null);
@@ -474,13 +487,17 @@ export default function Editor() {
       skipPreviewRebuild.current = false;
       return;
     }
+    if (editingInFrame.current) {
+      rebuildWhenDone.current = true;
+      return;
+    }
     setSelection(null);
     setPreviewDoc(previewHtml(site, activePage?.id ?? "", selectedId));
     // selectedId deliberately isn't a dependency: selecting a block only moves
     // an outline, and rebuilding the document for that would drop the caret the
     // click just placed. The frame is told about it instead, below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [site, activePage]);
+  }, [site, activePage, rebuildTick]);
 
   useEffect(() => {
     previewFrame.current?.contentWindow?.postMessage(
