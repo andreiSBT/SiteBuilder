@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -14,7 +14,13 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Sitebuilder",
-  description: "Build a website out of blocks, then export it as a single HTML file.",
+  description: "Build a website out of blocks, then put it online.",
+};
+
+// Tints the browser's own chrome on phones, so the app doesn't sit in a
+// mismatched white bar.
+export const viewport: Viewport = {
+  themeColor: "#6366f1",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
