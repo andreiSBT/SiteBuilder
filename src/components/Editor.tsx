@@ -15,6 +15,7 @@ import {
 } from "@/lib/projects";
 import { useDialog, useDialogOpen } from "./Dialogs";
 import FormatBar, { type Command, type SelectionState } from "./FormatBar";
+import Logo from "./Logo";
 import {
   FieldList,
   GoToPageContext,
@@ -580,9 +581,7 @@ export default function Editor() {
         {/* Toolbar */}
         <header className="flex items-center gap-3 border-b border-slate-200 bg-white px-4 py-2.5">
           <div className="flex items-center gap-2 font-semibold">
-            <span className="grid h-7 w-7 place-items-center rounded-md bg-indigo-600 text-sm text-white">
-              S
-            </span>
+            <Logo size={26} />
             <span className="hidden sm:inline">Sitebuilder</span>
           </div>
 

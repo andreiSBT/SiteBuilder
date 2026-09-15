@@ -5,6 +5,7 @@ import { TEMPLATES } from "@/lib/templates";
 import { exportHtml } from "@/lib/render";
 import { timeAgo, type SavedProject } from "@/lib/projects";
 import type { Site } from "@/lib/types";
+import Logo from "./Logo";
 import { Tip } from "./Tooltip";
 
 const THUMB_WIDTH = 1100; // the width we pretend the page is, before scaling down
@@ -34,7 +35,10 @@ export default function StartScreen({
       <div className="mx-auto max-w-5xl px-6 py-12">
         <header className="mb-8 flex items-end justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900">Sitebuilder</h1>
+            <h1 className="flex items-center gap-2.5 text-2xl font-bold tracking-tight text-slate-900">
+              <Logo size={34} />
+              Sitebuilder
+            </h1>
             <p className="mt-1 text-sm text-slate-500">
               Open one of your sites, or start a new one from a template.
             </p>
