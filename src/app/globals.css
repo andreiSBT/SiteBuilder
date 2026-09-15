@@ -1,26 +1,60 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* The editor chrome is intentionally light in both colour schemes — the page
+   you are building has its own theme, and a dark shell fights it. */
+html,
+body {
+  height: 100%;
+  background: #f1f5f9;
+  color: #0f172a;
+  font-family: var(--font-sans), system-ui, sans-serif;
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* Colour-picker sliders: the track shows the channel's gradient, so the browser's
+   default filled track would hide it. */
+.sb-range {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 10px;
+  border-radius: 999px;
+  outline: none;
+  border: 1px solid rgb(203 213 225);
+  cursor: pointer;
+}
+.sb-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid rgb(51 65 85);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.3);
+}
+.sb-range::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid rgb(51 65 85);
+}
+.sb-range:focus-visible {
+  box-shadow: 0 0 0 2px rgb(129 140 248);
+}
+
+/* The rich text box shows paragraphs the way the site will. */
+.sb-rich p {
+  margin: 0 0 8px;
+}
+.sb-rich p:last-child {
+  margin-bottom: 0;
+}
+.sb-rich:empty::before {
+  content: attr(data-placeholder);
+  color: rgb(148 163 184);
 }

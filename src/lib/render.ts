@@ -1,0 +1,369 @@
+import { BLOCKS, FONT_STACKS, esc } from "./blocks";
+import { inlineEditorScript } from "./inlineEditor";
+import type { Page, Site } from "./types";
+
+/** The stylesheet that ships with every exported site. */
+export function siteCss(site: Site): string {
+  const t = site.theme;
+  const font = FONT_STACKS[t.font] ?? FONT_STACKS.system;
+  return `:root {
+  --accent: ${t.accent};
+  --bg: ${t.bg};
+  --text: ${t.text};
+  --muted: ${t.muted};
+  --radius: ${t.radius}px;
+  --width: ${t.maxWidth}px;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: ${font};
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+main { max-width: var(--width); margin: 0 auto; padding: 0 24px; }
+.block { padding: 32px 0; }
+h1, h2, h3, h4 { line-height: 1.2; margin: 0 0 12px; }
+h1 { font-size: clamp(32px, 6vw, 52px); letter-spacing: -0.02em; }
+h2 { font-size: clamp(24px, 4vw, 32px); letter-spacing: -0.01em; }
+h3 { font-size: 20px; }
+h4 { font-size: 17px; }
+p { margin: 0 0 16px; }
+.prose p:last-child { margin-bottom: 0; }
+a { color: var(--accent); }
+
+.hero { padding: 64px 0 48px; }
+.hero .lead { font-size: clamp(17px, 2.2vw, 20px); color: var(--muted); max-width: 34em; margin-inline: auto; }
+.hero--tint { background: color-mix(in srgb, var(--accent) 8%, transparent); border-radius: var(--radius); padding-inline: 32px; margin-top: 24px; }
+.hero--gradient { background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 18%, transparent), transparent 70%); border-radius: var(--radius); padding-inline: 32px; margin-top: 24px; }
+
+.btn {
+  display: inline-block;
+  margin-top: 12px;
+  padding: 12px 22px;
+  border-radius: calc(var(--radius) * 0.7);
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+  text-decoration: none;
+  border: 2px solid var(--accent);
+  transition: opacity .15s ease, transform .15s ease;
+}
+.btn:hover { opacity: .9; transform: translateY(-1px); }
+.btn--outline { background: transparent; color: var(--accent); }
+
+.figure { margin: 0; }
+.figure img { display: block; width: 100%; height: auto; }
+.figure--rounded img { border-radius: var(--radius); }
+figcaption { margin-top: 8px; font-size: 14px; color: var(--muted); text-align: center; }
+
+.grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+.card {
+  padding: 20px;
+  border: 1px solid color-mix(in srgb, var(--text) 12%, transparent);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--text) 3%, transparent);
+}
+.card__icon { font-size: 28px; margin-bottom: 8px; }
+.card h3 { margin-bottom: 6px; }
+.card p { margin: 0; color: var(--muted); font-size: 15px; }
+
+.spacer { width: 100%; }
+
+.site-footer {
+  margin-top: 24px;
+  border-top: 1px solid color-mix(in srgb, var(--text) 12%, transparent);
+  color: var(--muted);
+  font-size: 14px;
+  text-align: center;
+}
+.site-footer p { margin-bottom: 8px; }
+.footer-links { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
+
+.site-nav {
+  border-bottom: 1px solid color-mix(in srgb, var(--text) 10%, transparent);
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  position: sticky;
+  top: 0;
+  backdrop-filter: blur(8px);
+  z-index: 10;
+}
+.nav-inner {
+  max-width: var(--width);
+  margin: 0 auto;
+  padding: 12px 24px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+.nav-brand { font-weight: 700; text-decoration: none; color: var(--text); margin-right: auto; }
+.site-nav nav { display: flex; gap: 18px; flex-wrap: wrap; }
+.site-nav nav a {
+  text-decoration: none;
+  color: var(--muted);
+  font-size: 15px;
+  font-weight: 500;
+  padding-bottom: 2px;
+  border-bottom: 2px solid transparent;
+}
+.site-nav nav a:hover { color: var(--text); }
+.site-nav nav a[aria-current="page"] { color: var(--accent); border-bottom-color: var(--accent); }
+
+@media (max-width: 600px) {
+  .block { padding: 24px 0; }
+  .hero { padding: 40px 0 32px; }
+  .nav-inner { padding: 10px 16px; gap: 12px; }
+}`;
+}
+
+/** The blocks of one page. */
+function pageBlocks(page: Page, site: Site, withIds: boolean): string {
+  return page.blocks
+    .map((block) => {
+      const def = BLOCKS[block.type];
+      if (!def) return "";
+      const html = def.toHtml(block.props, site.theme, { edit: withIds });
+      if (!withIds) return `      ${html}`;
+      // The editor needs to know which element is which block, so it can be clicked.
+      return `      <div data-block-id="${esc(block.id)}" class="sb-pick">${html}</div>`;
+    })
+    .join("\n");
+}
+
+/** The nav bar, shown only when there's more than one page to move between. */
+function navHtml(site: Site, activeSlug: string): string {
+  if (!site.nav || site.pages.length < 2) return "";
+  const links = site.pages
+    .map(
+      (p) =>
+        `<a href="#${esc(p.slug)}" data-nav="${esc(p.slug)}"${
+          p.slug === activeSlug ? ' aria-current="page"' : ""
+        }>${esc(p.name)}</a>`
+    )
+    .join("\n        ");
+  return `<header class="site-nav">
+    <div class="nav-inner">
+      <a class="nav-brand" href="#${esc(site.pages[0].slug)}">${esc(site.title)}</a>
+      <nav>
+        ${links}
+      </nav>
+    </div>
+  </header>
+`;
+}
+
+/**
+ * Every page lives in the one exported file, and the hash picks which is visible.
+ *
+ * Clicks on page links are handled directly rather than left to the browser:
+ * inside a sandboxed preview frame the browser refuses the fragment navigation
+ * and nothing happens at all. Handling it here means the same file behaves
+ * identically in the preview and on a real host, and `location.hash` is still
+ * updated when the browser allows it, so the back button keeps working.
+ */
+function routingScript(site: Site): string {
+  if (site.pages.length < 2) return "";
+  const first = JSON.stringify(site.pages[0].slug);
+  return `<script>
+(function () {
+  var pages = Array.prototype.slice.call(document.querySelectorAll(".page"));
+
+  function show(slug) {
+    var target = document.getElementById(slug) || document.getElementById(${first});
+    if (!target) return;
+    pages.forEach(function (p) { p.hidden = p !== target; });
+    Array.prototype.forEach.call(document.querySelectorAll("[data-nav]"), function (a) {
+      if (a.dataset.nav === target.id) a.setAttribute("aria-current", "page");
+      else a.removeAttribute("aria-current");
+    });
+    if (target.dataset.title) document.title = target.dataset.title;
+  }
+
+  function currentSlug() {
+    try {
+      return decodeURIComponent(location.hash.slice(1)) || ${first};
+    } catch (e) {
+      return ${first};
+    }
+  }
+
+  document.addEventListener("click", function (e) {
+    var link = e.target.closest && e.target.closest('a[href^="#"]');
+    if (!link) return;
+    var slug = decodeURIComponent(link.getAttribute("href").slice(1));
+    // Leave non-page anchors (like href="#") to behave normally.
+    if (!slug || !document.getElementById(slug)) return;
+    e.preventDefault();
+    // In the editor's sandboxed preview the document is served from a blob URL,
+    // and the browser refuses to navigate to it — so don't ask. Anywhere real
+    // (http, https, file) the hash updates and the back button works.
+    if (location.protocol !== "blob:" && currentSlug() !== slug) {
+      try {
+        location.hash = slug;
+      } catch (err) {
+        /* showing the page is what matters */
+      }
+    }
+    show(slug);
+    window.scrollTo(0, 0);
+  });
+
+  window.addEventListener("hashchange", function () {
+    show(currentSlug());
+    window.scrollTo(0, 0);
+  });
+
+  show(currentSlug());
+})();
+</script>
+`;
+}
+
+/**
+ * Preview-only. Hands any link that leaves the site up to the editor instead of
+ * following it, so the preview can't navigate away from the site being built.
+ */
+const EXTERNAL_LINK_GUARD = `<script>
+(function () {
+  document.addEventListener("click", function (e) {
+    var link = e.target.closest && e.target.closest("a[href]");
+    if (!link) return;
+    var href = link.getAttribute("href");
+    // Page links are the router's job; everything else leaves the site.
+    if (href.charAt(0) === "#") return;
+    e.preventDefault();
+    parent.postMessage({ type: "sb:external", href: href }, "*");
+  });
+})();
+</script>
+`;
+
+/**
+ * The finished, standalone HTML file — all pages in one document.
+ *
+ * `interactive: false` leaves out the routing script, for the thumbnails that
+ * render with scripts disabled. They only ever show the first page, and without
+ * this the blocked script logs an error in the console.
+ *
+ * `guardExternalLinks` is for the in-app preview only: a link that leaves the
+ * site is reported to the editor, which asks before opening it. The real
+ * exported file never includes this — visitors expect links to just work.
+ */
+export function exportHtml(
+  site: Site,
+  opts: { interactive?: boolean; guardExternalLinks?: boolean } = {}
+): string {
+  const interactive = opts.interactive !== false;
+  const pages = site.pages
+    .map(
+      (page, i) =>
+        `    <section class="page" id="${esc(page.slug)}" data-title="${esc(
+          `${site.title} · ${page.name}`
+        )}"${i === 0 ? "" : " hidden"}>
+${pageBlocks(page, site, false)}
+    </section>`
+    )
+    .join("\n");
+
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${esc(site.title)}</title>
+<style>
+${siteCss(site)}
+</style>
+</head>
+<body>
+${navHtml(site, site.pages[0]?.slug ?? "")}<main>
+${pages}
+</main>
+${interactive ? routingScript(site) : ""}${
+    opts.guardExternalLinks ? EXTERNAL_LINK_GUARD : ""
+  }</body>
+</html>
+`;
+}
+
+/** The same document, showing one page, plus the editor's click-to-select wiring. */
+export function previewHtml(site: Site, pageId: string, selectedId: string | null): string {
+  const page = site.pages.find((p) => p.id === pageId) ?? site.pages[0];
+  if (!page) return "<!doctype html><html><body></body></html>";
+
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${esc(site.title)}</title>
+<style>
+${siteCss(site)}
+.sb-pick { position: relative; }
+.sb-pick:hover { outline: 1px dashed color-mix(in srgb, var(--accent) 35%, transparent); outline-offset: -1px; }
+.sb-pick[data-selected="true"] { outline: 2px solid color-mix(in srgb, var(--accent) 60%, transparent); outline-offset: -2px; }
+/* Text you can type straight into. */
+[data-edit] { cursor: text; border-radius: 3px; }
+[data-edit]:hover { box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 22%, transparent); }
+[data-edit]:empty::before {
+  content: attr(data-placeholder);
+  opacity: 0.4;
+}
+[data-edit]:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--accent);
+  background: color-mix(in srgb, var(--accent) 5%, transparent);
+}
+</style>
+</head>
+<body>
+${navHtml(site, page.slug)}<main>
+    <section class="page">
+${pageBlocks(page, site, true)}
+    </section>
+</main>
+${inlineEditorScript()}<script>
+(function () {
+  var selected = ${JSON.stringify(selectedId)};
+  if (selected) {
+    var el = document.querySelector('[data-block-id="' + CSS.escape(selected) + '"]');
+    if (el) el.setAttribute("data-selected", "true");
+  }
+  document.addEventListener("click", function (e) {
+    // Nothing inside the preview should navigate while you're editing.
+    var link = e.target.closest("a");
+    if (link) e.preventDefault();
+
+    // Clicking a nav link switches the page you're editing.
+    var navLink = e.target.closest("[data-nav]");
+    if (navLink) {
+      parent.postMessage({ type: "sb:page", slug: navLink.dataset.nav }, "*");
+      return;
+    }
+
+    var hit = e.target.closest("[data-block-id]");
+    parent.postMessage({ type: "sb:select", id: hit ? hit.dataset.blockId : null }, "*");
+  });
+
+  // A single click selects the button so you can edit it; a double-click follows
+  // it, the way it will behave for real. Preview mode does it on one click.
+  document.addEventListener("dblclick", function (e) {
+    var link = e.target.closest("a[href]");
+    if (!link) return;
+    e.preventDefault();
+    var href = link.getAttribute("href");
+    if (href.charAt(0) === "#") {
+      parent.postMessage({ type: "sb:page", slug: href.slice(1) }, "*");
+    } else {
+      parent.postMessage({ type: "sb:external", href: href }, "*");
+    }
+  });
+})();
+</script>
+</body>
+</html>
+`;
+}
