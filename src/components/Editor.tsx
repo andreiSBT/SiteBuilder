@@ -577,7 +577,18 @@ export default function Editor() {
           />
         )}
 
-        {showPublish && <PublishDialog site={site} onClose={() => setShowPublish(false)} />}
+        {showPublish && (
+          <PublishDialog
+            site={site}
+            onPublished={(where, record) =>
+              setSite((s) => ({
+                ...s,
+                published: { ...s.published, [where]: { ...record, at: Date.now() } },
+              }))
+            }
+            onClose={() => setShowPublish(false)}
+          />
+        )}
 
         {showPreview && (
           <PreviewOverlay

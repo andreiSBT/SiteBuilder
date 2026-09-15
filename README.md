@@ -314,6 +314,18 @@ Only Cloudflare Drop is offered. Netlify Drop takes anonymous uploads too, but
 the no-account path fails often enough that they recommend signing up — a button that
 usually errors is worse than no button.
 
+### The address is remembered
+
+Publishing used to show the link once, and closing the dialog lost it. A site now keeps
+the addresses it's been published to (`site.published`), so **Publish** always opens with
+"Your site is online at…" — newest first, with when it was published and a Copy button
+next to each.
+
+It travels inside the project, so it survives a reload, and comes back when you reopen the
+downloaded `.html`. Visitors never see it: it lives in the embedded project block, not the
+page. The share link isn't listed there, because pressing the button again rebuilds exactly
+the same link from the site itself.
+
 ### Why there's no permanent free host without an account
 
 Because permanent anonymous hosting gets used for scam and malware pages within days. The

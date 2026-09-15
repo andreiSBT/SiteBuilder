@@ -4,6 +4,7 @@ import { useState } from "react";
 import { createPortal } from "react-dom";
 import { projectSlug } from "@/lib/publishShared";
 import { canShareByLink, encodeSiteLink } from "@/lib/shareLink";
+import { timeAgo } from "@/lib/projects";
 import type { Site } from "@/lib/types";
 import { exportHtml } from "@/lib/render";
 
@@ -77,7 +78,16 @@ const HOSTS: Record<
  */
 const DROP = { name: "Cloudflare Drop", url: "https://www.cloudflare.com/drop/" };
 
-export default function PublishDialog({ site, onClose }: { site: Site; onClose: () => void }) {
+export default function PublishDialog({
+  site,
+  onPublished,
+  onClose,
+}: {
+  site: Site;
+  /** Remembers the address, so it isn't lost when this closes. */
+  onPublished: (host: string, record: { url: string; repoUrl?: string }) => void;
+  onClose: () => void;
+}) {
   const [host, setHost] = useState<Host>(canShareByLink() ? "link" : "drop");
   const [token, setToken] = useState("");
   const [remember, setRemember] = useState(false);
@@ -116,6 +126,7 @@ export default function PublishDialog({ site, onClose }: { site: Site; onClose: 
         return;
       }
       setResult(data as Result);
+      onPublished(host, { url: data.url, repoUrl: data.repoUrl });
       try {
         if (remember) localStorage.setItem(TOKEN_KEY(host), token);
         else localStorage.removeItem(TOKEN_KEY(host));
@@ -129,6 +140,7 @@ export default function PublishDialog({ site, onClose }: { site: Site; onClose: 
     }
   };
 
+  const alreadyPublished = Object.entries(site.published ?? {}).sort((a, b) => b[1].at - a[1].at);
   const tabs: Host[] = canShareByLink()
     ? ["link", "drop", "vercel", "github"]
     : ["drop", "vercel", "github"];
@@ -220,6 +232,38 @@ export default function PublishDialog({ site, onClose }: { site: Site; onClose: 
             </button>
           ))}
         </div>
+
+        {alreadyPublished.length > 0 && (
+          <div className="mt-3 rounded-md border border-slate-200 bg-slate-50 p-2.5">
+            <h3 className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+              Your site is online at
+            </h3>
+            <div className="mt-1.5 flex flex-col gap-1.5">
+              {alreadyPublished.map(([where, record]) => (
+                <div key={where} className="flex items-center gap-2">
+                  <a
+                    href={record.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="min-w-0 flex-1 truncate font-mono text-[11px] text-indigo-700 hover:underline"
+                    title={record.url}
+                  >
+                    {record.url.replace(/^https?:\/\//, "")}
+                  </a>
+                  <span className="shrink-0 text-[10px] text-slate-400">
+                    {HOSTS[where as Host]?.name ?? where} · {timeAgo(record.at)}
+                  </span>
+                  <button
+                    onClick={() => copyText(record.url)}
+                    className="shrink-0 rounded border border-slate-300 bg-white px-1.5 py-0.5 text-[10px] font-medium text-slate-700 hover:bg-slate-100"
+                  >
+                    Copy
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <p className="mt-3 text-xs leading-relaxed text-slate-600">{info.blurb}</p>
         <p className="mt-1 text-[11px] text-slate-400">{info.lasts}</p>

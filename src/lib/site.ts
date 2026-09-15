@@ -67,6 +67,11 @@ export function migrate(raw: unknown): Site {
   const theme = { ...base.theme, ...(r.theme as object) };
   const title = typeof r.title === "string" ? r.title : base.title;
   const nav = typeof r.nav === "boolean" ? r.nav : true;
+  // Where it's been published before, if anywhere.
+  const published =
+    r.published && typeof r.published === "object"
+      ? (r.published as Site["published"])
+      : undefined;
 
   if (Array.isArray(r.pages) && r.pages.length > 0) {
     const pages = (r.pages as Page[]).map((p, i) => ({
@@ -75,7 +80,7 @@ export function migrate(raw: unknown): Site {
       slug: typeof p?.slug === "string" && p.slug ? p.slug : slugify(p?.name ?? `page-${i + 1}`),
       blocks: Array.isArray(p?.blocks) ? p.blocks : [],
     }));
-    return { title, theme, nav, pages };
+    return { title, theme, nav, published, pages };
   }
 
   if (Array.isArray(r.blocks)) {
@@ -83,9 +88,10 @@ export function migrate(raw: unknown): Site {
       title,
       theme,
       nav,
+      published,
       pages: [{ id: newId("page"), name: "Home", slug: "home", blocks: r.blocks as Block[] }],
     };
   }
 
-  return { ...base, title, theme, nav };
+  return { ...base, title, theme, nav, published };
 }

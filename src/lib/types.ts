@@ -34,11 +34,20 @@ export type Page = {
   blocks: Block[];
 };
 
+/** Where a site has been put online before, so the link isn't lost. */
+export type PublishedRecord = {
+  url: string;
+  repoUrl?: string;
+  at: number;
+};
+
 export type Site = {
   title: string;
   theme: Theme;
   /** Show the auto-generated navigation bar (only meaningful with 2+ pages). */
   nav: boolean;
+  /** Keyed by host: "vercel", "github". Travels with the project. */
+  published?: Record<string, PublishedRecord>;
   pages: Page[];
 };
 
