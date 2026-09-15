@@ -1,6 +1,23 @@
 import { DEFAULT_THEME } from "./blocks";
 import type { Block, Page, Site } from "./types";
 
+/**
+ * Pull the project back out of a finished .html page, if it has one.
+ * Returns null for a plain HTML file that wasn't made here.
+ */
+export function projectFromHtml(html: string): unknown | null {
+  const match = html.match(
+    /<script type="application\/json" id="sitebuilder-project">([\s\S]*?)<\/script>/
+  );
+  if (!match) return null;
+  try {
+    // JSON.parse turns the escaped \u003c back into "<" on its own.
+    return JSON.parse(match[1]);
+  } catch {
+    return null;
+  }
+}
+
 export function slugify(name: string): string {
   return (
     name

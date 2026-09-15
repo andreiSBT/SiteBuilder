@@ -108,7 +108,7 @@ export default function PublishDialog({ site, onClose }: { site: Site; onClose: 
       const response = await fetch(`/api/publish/${host}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, name, html: exportHtml(site) }),
+        body: JSON.stringify({ token, name, html: exportHtml(site, { embedProject: true }) }),
       });
       const data = await response.json();
       if (!response.ok) {
@@ -180,7 +180,7 @@ export default function PublishDialog({ site, onClose }: { site: Site; onClose: 
 
   /** Save the file, then open the drop page to drag it onto. */
   const startDrop = (url: string) => {
-    const blob = new Blob([exportHtml(site)], { type: "text/html" });
+    const blob = new Blob([exportHtml(site, { embedProject: true })], { type: "text/html" });
     const href = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = href;

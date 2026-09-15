@@ -222,6 +222,20 @@ function routingScript(site: Site): string {
 `;
 }
 
+/** Marks the block of JSON that lets a finished page be opened again. */
+export const PROJECT_TAG = "sitebuilder-project";
+
+/**
+ * The editable project, tucked into the page as inert data.
+ *
+ * Every "<" is escaped, so nothing inside a site's own text can close this tag
+ * early and break out into the document.
+ */
+function embeddedProject(site: Site): string {
+  const json = JSON.stringify(site).replace(/</g, "\\u003c");
+  return `<script type="application/json" id="${PROJECT_TAG}">${json}</script>\n`;
+}
+
 /**
  * Preview-only. Hands any link that leaves the site up to the editor instead of
  * following it, so the preview can't navigate away from the site being built.
@@ -248,13 +262,18 @@ const EXTERNAL_LINK_GUARD = `<script>
  * render with scripts disabled. They only ever show the first page, and without
  * this the blocked script logs an error in the console.
  *
+ * `embedProject` tucks the editable project inside the finished page, so the
+ * .html file can be opened again in the builder. It's invisible to visitors and
+ * costs a couple of kilobytes — left out of the share link, where every
+ * character shows up in the URL.
+ *
  * `guardExternalLinks` is for the in-app preview only: a link that leaves the
  * site is reported to the editor, which asks before opening it. The real
  * exported file never includes this — visitors expect links to just work.
  */
 export function exportHtml(
   site: Site,
-  opts: { interactive?: boolean; guardExternalLinks?: boolean } = {}
+  opts: { interactive?: boolean; guardExternalLinks?: boolean; embedProject?: boolean } = {}
 ): string {
   const interactive = opts.interactive !== false;
   const pages = site.pages
@@ -284,7 +303,7 @@ ${pages}
 </main>
 ${interactive ? routingScript(site) : ""}${
     opts.guardExternalLinks ? EXTERNAL_LINK_GUARD : ""
-  }</body>
+  }${opts.embedProject ? embeddedProject(site) : ""}</body>
 </html>
 `;
 }

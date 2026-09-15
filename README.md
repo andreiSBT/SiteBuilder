@@ -361,14 +361,23 @@ Two kinds, deliberately:
 - **Save** keeps the site *inside the app*, in the browser. Your sites show up on the
   start screen with live thumbnails — open, copy, or delete them there. After the first
   Save, edits keep saving themselves, so it's one click ever, not one click per change.
-- **⤓** downloads a `site-project.json` you can back up or move to another computer, and
-  **Open a file…** loads one back. **Export HTML** is the finished website.
+- **Download** saves one `.html` file that is both things at once: a finished web page
+  anyone can open, *and* the project. **Open a file…** takes it straight back, so there's
+  no second file to keep track of.
 
 In-app saving uses the browser's `localStorage` (a few MB, this browser only). If it
 fills up, the Save button says "No space" rather than pretending it worked — that's when
 to download a project file.
 
 - Work in progress autosaves to `localStorage`, so a refresh never loses anything.
+- **One file does both jobs.** `exportHtml(site, { embedProject: true })` tucks the project
+  into the page as an inert `<script type="application/json">` block, and
+  `projectFromHtml()` reads it back. Visitors never see it; it costs about 2KB. Every `<`
+  in that JSON is escaped, so a site whose own text contains `</script>` can't close the
+  tag early and break out into the page.
+- It's left out of the **share link** on purpose — there every byte becomes URL characters.
+  Downloads and published sites carry it, so a live page can be pulled back in and edited.
+- Old `site-project.json` files still open.
 - Old project files from before pages existed still open — `migrate()` in `src/lib/site.ts`
   turns their single block list into one "Home" page.
 

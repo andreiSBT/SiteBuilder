@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BLOCKS, BLOCK_ORDER, FONT_OPTIONS, newBlock } from "@/lib/blocks";
 import { exportHtml, previewHtml } from "@/lib/render";
 import { richToText, sanitizeRich } from "@/lib/sanitize";
-import { emptySite, migrate, newPage, uniqueSlug } from "@/lib/site";
+import { emptySite, migrate, newPage, projectFromHtml, uniqueSlug } from "@/lib/site";
 import type { Block, BlockType, Field, Page, Site } from "@/lib/types";
 import {
   deleteProject,
@@ -377,17 +377,26 @@ export default function Editor() {
 
   const download = () =>
     downloadFile(
-      exportHtml(site),
+      // Carries the project inside it, so this same file can be opened again.
+      exportHtml(site, { embedProject: true }),
       `${site.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "site"}.html`,
       "text/html"
     );
 
-  const saveFile = () =>
-    downloadFile(JSON.stringify(site, null, 2), "site-project.json", "application/json");
-
+  /** Opens either a project file or a page exported from here. */
   const openProject = async (file: File) => {
     try {
-      const parsed = migrate(JSON.parse(await file.text()));
+      const text = await file.text();
+      const raw = /^\s*[{[]/.test(text) ? JSON.parse(text) : projectFromHtml(text);
+      if (raw === null) {
+        dialog.alert({
+          title: "That page can't be opened",
+          message:
+            "It's an HTML file, but it wasn't made here — only pages exported from Sitebuilder carry the project inside them.",
+        });
+        return;
+      }
+      const parsed = migrate(raw);
       setSite(parsed);
       setProjectId(null);
       localStorage.removeItem(CURRENT_KEY);
@@ -397,7 +406,7 @@ export default function Editor() {
     } catch {
       dialog.alert({
         title: "That file didn't open",
-        message: "It doesn't look like a site-project.json saved by Sitebuilder.",
+        message: "It doesn't look like a site made in Sitebuilder.",
       });
     }
   };
@@ -612,7 +621,7 @@ export default function Editor() {
             autoComplete="off"
               ref={fileInput}
               type="file"
-              accept="application/json"
+              accept=".html,.json,text/html,application/json"
               className="hidden"
               onChange={(e) => {
                 const f = e.target.files?.[0];
@@ -646,12 +655,16 @@ export default function Editor() {
             <ToolbarIcon title="Save a copy" onClick={saveCopy}>
               ⧉
             </ToolbarIcon>
-            <ToolbarIcon title="Download a project file to your computer" onClick={saveFile}>
-              ⤓
-            </ToolbarIcon>
 
             <ToolbarBtn onClick={() => setShowPreview(true)}>Preview</ToolbarBtn>
-            <ToolbarBtn onClick={download}>Download</ToolbarBtn>
+            <Tip label="Saves one .html file: a real web page, which you can also open here again">
+              <button
+                onClick={download}
+                className="rounded-md border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
+              >
+                Download
+              </button>
+            </Tip>
             <button
               onClick={() => setShowPublish(true)}
               className="rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-indigo-700"
