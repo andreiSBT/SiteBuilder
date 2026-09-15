@@ -321,6 +321,10 @@ the addresses it's been published to (`site.published`), so **Publish** always o
 "Your site is online at…" — newest first, with when it was published and a Copy button
 next to each.
 
+Once a site is live, the newest address also sits **in the bottom corner of the right-hand
+panel** — a green dot, the address, and a Copy button — so it's in front of you while you
+work instead of behind a button. The panel scrolls under it; the address stays put.
+
 It travels inside the project, so it survives a reload, and comes back when you reopen the
 downloaded `.html`. Visitors never see it: it lives in the embedded project block, not the
 page. The share link isn't listed there, because pressing the button again rebuilds exactly

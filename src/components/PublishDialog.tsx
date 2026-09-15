@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { createPortal } from "react-dom";
 import { projectSlug } from "@/lib/publishShared";
+import { copyText as copy } from "@/lib/clipboard";
 import { canShareByLink, encodeSiteLink } from "@/lib/shareLink";
 import { timeAgo } from "@/lib/projects";
 import type { Site } from "@/lib/types";
@@ -146,32 +147,10 @@ export default function PublishDialog({
     : ["drop", "vercel", "github"];
   const info = HOSTS[host];
 
-  /** Copy, falling back to the old way when the clipboard API says no. */
   const copyText = async (text: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
+    if (await copy(text)) {
       setCopied(true);
       window.setTimeout(() => setCopied(false), 2000);
-      return;
-    } catch {
-      // Older browsers, and any page the browser doesn't trust with the
-      // clipboard, land here.
-    }
-    try {
-      const scratch = document.createElement("textarea");
-      scratch.value = text;
-      scratch.style.position = "fixed";
-      scratch.style.opacity = "0";
-      document.body.appendChild(scratch);
-      scratch.select();
-      const worked = document.execCommand("copy");
-      scratch.remove();
-      if (worked) {
-        setCopied(true);
-        window.setTimeout(() => setCopied(false), 2000);
-      }
-    } catch {
-      // Then the link is still sitting in the box to copy by hand.
     }
   };
 
@@ -369,15 +348,7 @@ export default function PublishDialog({
             </div>
           </div>
         ) : result ? (
-          <Success result={result} copied={copied} onCopy={async () => {
-            try {
-              await navigator.clipboard.writeText(result.url);
-              setCopied(true);
-              window.setTimeout(() => setCopied(false), 1600);
-            } catch {
-              setCopied(false);
-            }
-          }} />
+          <Success result={result} copied={copied} onCopy={() => copyText(result.url)} />
         ) : (
           <>
             <label className="mt-4 block text-xs font-medium text-slate-600">

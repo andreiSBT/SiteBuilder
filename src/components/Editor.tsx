@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BLOCKS, BLOCK_ORDER, FONT_OPTIONS, newBlock } from "@/lib/blocks";
 import { exportHtml, previewHtml } from "@/lib/render";
+import { copyText } from "@/lib/clipboard";
 import { richToText, sanitizeRich } from "@/lib/sanitize";
 import { emptySite, migrate, newPage, projectFromHtml, uniqueSlug } from "@/lib/site";
 import type { Block, BlockType, Field, Page, Site } from "@/lib/types";
@@ -82,6 +83,7 @@ export default function Editor() {
   const [showPreview, setShowPreview] = useState(false);
   const [showPublish, setShowPublish] = useState(false);
   const [externalHref, setExternalHref] = useState<string | null>(null);
+  const [linkCopied, setLinkCopied] = useState(false);
   const [saved, setSaved] = useState<SavedProject[]>([]);
   const [projectId, setProjectId] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<"idle" | "saved" | "error">("idle");
@@ -548,6 +550,9 @@ export default function Editor() {
     setShowStart(false);
   };
 
+  // The most recent place this site was published, shown in the corner.
+  const liveAddress = Object.values(site.published ?? {}).sort((a, b) => b.at - a.at)[0] ?? null;
+
   const goToPage = useCallback(
     (slug: string) => {
       const target = site.pages.find((p) => p.slug === slug);
@@ -891,7 +896,7 @@ export default function Editor() {
           </main>
 
           {/* Right: inspector */}
-          <aside className="flex w-72 shrink-0 flex-col overflow-y-auto border-l border-slate-200 bg-white">
+          <aside className="flex w-72 shrink-0 flex-col border-l border-slate-200 bg-white">
             <div className="flex border-b border-slate-200">
               {(["block", "theme"] as const).map((t) => (
                 <button
@@ -908,7 +913,7 @@ export default function Editor() {
               ))}
             </div>
 
-            <div className="p-3.5">
+            <div className="flex-1 overflow-y-auto p-3.5">
               {tab === "theme" ? (
                 <FieldList
                   fields={THEME_FIELDS}
@@ -963,6 +968,41 @@ export default function Editor() {
                 </p>
               )}
             </div>
+
+            {liveAddress && (
+              <footer className="border-t border-slate-200 bg-slate-50 px-3 py-2.5">
+                <div className="flex items-center gap-1.5">
+                  <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
+                  <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                    Live at
+                  </span>
+                </div>
+                <div className="mt-1 flex items-center gap-1.5">
+                  <a
+                    href={liveAddress.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title={liveAddress.url}
+                    className="min-w-0 flex-1 truncate font-mono text-[11px] text-indigo-700 hover:underline"
+                  >
+                    {liveAddress.url.replace(/^https?:\/\//, "").replace(/\/$/, "")}
+                  </a>
+                  <Tip label="Copy the address">
+                    <button
+                      onClick={async () => {
+                        if (await copyText(liveAddress.url)) {
+                          setLinkCopied(true);
+                          window.setTimeout(() => setLinkCopied(false), 1600);
+                        }
+                      }}
+                      className="shrink-0 rounded border border-slate-300 bg-white px-1.5 py-0.5 text-[10px] font-medium text-slate-700 transition hover:bg-slate-100"
+                    >
+                      {linkCopied ? "Copied ✓" : "Copy"}
+                    </button>
+                  </Tip>
+                </div>
+              </footer>
+            )}
           </aside>
         </div>
       </div>
