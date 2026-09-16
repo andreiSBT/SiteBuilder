@@ -140,6 +140,22 @@ and its `<b>` output is normalised to `<strong>` by the sanitiser. Size, font an
 can't use it (`fontSize` only understands 1–7, `foreColor` emits `<font>` tags), so those
 wrap the selection in a styled `<span>` directly.
 
+## Spacing
+
+Every block leaves about 28px above and below itself. A **heading is the exception**: it
+keeps its space above but almost none below, because a heading belongs to what comes after
+it. With equal padding it sat 76px from the paragraph it introduced — marooned halfway
+between two things, so the page read as a list of unrelated items rather than sections.
+It's 30px now.
+
+The **Spacer** block adds to that rather than replacing it, so a 48px spacer between two
+blocks makes a 104px gap. That surprised its author, never mind anyone else, so the field
+says "Extra gap" and starts at 24 rather than 48. If a gap looks too big, that's usually a
+spacer doing exactly what it was told.
+
+Headings use `text-wrap: balance` and paragraphs `text-wrap: pretty`, which keeps a
+heading from leaving one word stranded on its own line.
+
 ## Text size
 
 Hero, Heading and Text blocks have a **Text size** control for the whole block — drag the

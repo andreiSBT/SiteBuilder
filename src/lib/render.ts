@@ -24,24 +24,38 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 main { max-width: var(--width); margin: 0 auto; padding: 0 24px; }
-.block { padding: 32px 0; }
-h1, h2, h3, h4 { line-height: 1.2; margin: 0 0 12px; }
+.block { padding: 28px 0; }
+/*
+ * A heading belongs to what comes after it. With the same padding as every
+ * other block it sits marooned halfway between the two, and the page reads as
+ * a list of unrelated things rather than sections.
+ */
+.block--heading { padding-bottom: 2px; }
+.block--heading > h2 { margin-bottom: 0; }
+
+h1, h2, h3, h4 { line-height: 1.2; margin: 0 0 12px; text-wrap: balance; }
 h1 { font-size: clamp(32px, 6vw, 52px); letter-spacing: -0.02em; }
 h2 { font-size: clamp(24px, 4vw, 32px); letter-spacing: -0.01em; }
 h3 { font-size: 20px; }
 h4 { font-size: 17px; }
-p { margin: 0 0 16px; }
+p { margin: 0 0 16px; text-wrap: pretty; }
 .prose p:last-child { margin-bottom: 0; }
 a { color: var(--accent); }
 
-.hero { padding: 64px 0 48px; }
-.hero .lead { font-size: clamp(17px, 2.2vw, 20px); color: var(--muted); max-width: 34em; margin-inline: auto; }
+.hero { padding: 56px 0 52px; }
+.hero h1 { margin-bottom: 0; }
+.hero .lead {
+  font-size: clamp(17px, 2.2vw, 20px);
+  color: var(--muted);
+  max-width: 34em;
+  margin: 14px auto 0;
+}
 .hero--tint { background: color-mix(in srgb, var(--accent) 8%, transparent); border-radius: var(--radius); padding-inline: 32px; margin-top: 24px; }
 .hero--gradient { background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 18%, transparent), transparent 70%); border-radius: var(--radius); padding-inline: 32px; margin-top: 24px; }
 
 .btn {
   display: inline-block;
-  margin-top: 12px;
+  margin-top: 22px;
   padding: 12px 22px;
   border-radius: calc(var(--radius) * 0.7);
   background: var(--accent);
@@ -113,7 +127,7 @@ figcaption { margin-top: 8px; font-size: 14px; color: var(--muted); text-align: 
 .site-nav nav a[aria-current="page"] { color: var(--accent); border-bottom-color: var(--accent); }
 
 @media (max-width: 600px) {
-  .block { padding: 24px 0; }
+  .block { padding: 22px 0; }
   .hero { padding: 40px 0 32px; }
   .nav-inner { padding: 10px 16px; gap: 12px; }
 }`;

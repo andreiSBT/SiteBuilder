@@ -143,7 +143,7 @@ export const BLOCKS: Record<BlockType, BlockDef> = {
     defaults: () => ({ text: "A section title", size: 0, align: "left" }),
     // Always an <h2>: the size slider handles how big it looks, and screen
     // readers still get a real heading.
-    toHtml: (p, _theme, o) => `<section class="block">
+    toHtml: (p, _theme, o) => `<section class="block block--heading">
       <h2 style="text-align:${esc(p.align)}${sizeStyle(p.size, 14)}"${edit(o, "text")}>${richToHtml(p.text)}</h2>
     </section>`,
   },
@@ -273,9 +273,21 @@ export const BLOCKS: Record<BlockType, BlockDef> = {
     type: "spacer",
     name: "Spacer",
     icon: "↕",
-    description: "Empty breathing room",
-    fields: [{ key: "height", label: "Height (px)", type: "number", min: 8, max: 300, step: 4 }],
-    defaults: () => ({ height: 48 }),
+    description: "Extra gap, on top of the space blocks already leave",
+    fields: [
+      {
+        key: "height",
+        // Blocks already leave ~28px above and below themselves, so this is
+        // added to that rather than being the whole gap. Saying "extra" is the
+        // difference between a 48 that looks like 48 and one that looks like 104.
+        label: "Extra gap (px)",
+        type: "number",
+        min: 0,
+        max: 300,
+        step: 4,
+      },
+    ],
+    defaults: () => ({ height: 24 }),
     toHtml: (p) => {
       const h = Number(p.height);
       const height = Number.isFinite(h) ? Math.min(300, Math.max(0, h)) : 48;
