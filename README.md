@@ -321,8 +321,8 @@ the addresses it's been published to (`site.published`), so **Publish** always o
 "Your site is online at…" — newest first, with when it was published and a Copy button
 next to each.
 
-The **bottom corner of the right-hand panel** always says where the site stands: "Not
-online yet" with a *Put it online* button before you publish, and a green dot with the
+The **bottom corner of the right-hand panel** always says where the site stands: "Not on a
+host yet", with *Copy share link* and *Put it online* buttons before you publish, and a green dot with the
 address and a Copy button after. Never a blank space you have to guess about. The panel
 scrolls under it; the corner stays put.
 
@@ -332,9 +332,10 @@ left no record. So the dialog has a **"Already put it online somewhere?"** box �
 address, press Remember, and the corner shows it from then on. A bare host like
 `example.pages.dev` is fine; it goes through the same `normalizeUrl()` as any link.
 
-The share link isn't recorded, and shouldn't be: it *contains* the site, so storing it in
-the site would make the next link bigger, and the one after that bigger again. Press the
-button and it's rebuilt exactly.
+The share link is never recorded, for two reasons: it *contains* the site, so storing it
+inside that site would make the next link bigger and the one after bigger again — and a
+saved one would be **wrong the moment you edit anything**. So the corner has a **Copy share
+link** button that builds one fresh each time, which is always right by construction.
 
 It travels inside the project, so it survives a reload, and comes back when you reopen the
 downloaded `.html`. Visitors never see it: it lives in the embedded project block, not the

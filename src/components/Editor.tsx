@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BLOCKS, BLOCK_ORDER, FONT_OPTIONS, newBlock } from "@/lib/blocks";
 import { exportHtml, previewHtml } from "@/lib/render";
 import { copyText } from "@/lib/clipboard";
+import { canShareByLink, encodeSiteLink } from "@/lib/shareLink";
 import { richToText, sanitizeRich } from "@/lib/sanitize";
 import { emptySite, migrate, newPage, projectFromHtml, uniqueSlug } from "@/lib/site";
 import type { Block, BlockType, Field, Page, Site } from "@/lib/types";
@@ -84,6 +85,7 @@ export default function Editor() {
   const [showPublish, setShowPublish] = useState(false);
   const [externalHref, setExternalHref] = useState<string | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
+  const [shareCopied, setShareCopied] = useState(false);
   const [saved, setSaved] = useState<SavedProject[]>([]);
   const [projectId, setProjectId] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<"idle" | "saved" | "error">("idle");
@@ -550,6 +552,23 @@ export default function Editor() {
     setShowStart(false);
   };
 
+  /**
+   * Build a share link and copy it, right now.
+   *
+   * Never stored: the link carries the site inside it, so a saved one would be
+   * wrong the moment anything is edited. Made fresh each time instead.
+   */
+  const copyShareLink = async () => {
+    const link = await encodeSiteLink(
+      exportHtml(site),
+      window.location.origin
+    );
+    if (await copyText(link)) {
+      setShareCopied(true);
+      window.setTimeout(() => setShareCopied(false), 1800);
+    }
+  };
+
   // The most recent place this site was published, shown in the corner.
   const liveAddress = Object.values(site.published ?? {}).sort((a, b) => b.at - a.at)[0] ?? null;
 
@@ -1006,18 +1025,32 @@ export default function Editor() {
                   </div>
                 </>
               ) : (
-                <div className="flex items-center gap-2">
-                  <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-slate-300" />
-                  <span className="min-w-0 flex-1 text-[11px] leading-tight text-slate-500">
-                    Not online yet
-                  </span>
-                  <button
-                    onClick={() => setShowPublish(true)}
-                    className="shrink-0 rounded border border-slate-300 bg-white px-1.5 py-0.5 text-[10px] font-medium text-indigo-700 transition hover:bg-slate-100"
-                  >
-                    Put it online
-                  </button>
-                </div>
+                <>
+                  <div className="flex items-center gap-1.5">
+                    <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-slate-300" />
+                    <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                      Not on a host yet
+                    </span>
+                  </div>
+                  <div className="mt-1 flex items-center gap-1.5">
+                    {canShareByLink() && (
+                      <Tip label="Copies a link with the whole site inside it — made fresh, so it always matches what you see">
+                        <button
+                          onClick={copyShareLink}
+                          className="flex-1 rounded border border-slate-300 bg-white px-1.5 py-1 text-[10px] font-medium text-slate-700 transition hover:bg-slate-100"
+                        >
+                          {shareCopied ? "Copied ✓" : "Copy share link"}
+                        </button>
+                      </Tip>
+                    )}
+                    <button
+                      onClick={() => setShowPublish(true)}
+                      className="flex-1 rounded border border-slate-300 bg-white px-1.5 py-1 text-[10px] font-medium text-indigo-700 transition hover:bg-slate-100"
+                    >
+                      Put it online
+                    </button>
+                  </div>
+                </>
               )}
             </footer>
           </aside>
