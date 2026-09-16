@@ -1158,7 +1158,7 @@ export default function Editor() {
                       : "border-transparent text-slate-500 hover:text-slate-700"
                   }`}
                 >
-                  {t === "block" ? "Block" : t === "theme" ? "Theme" : "Claude"}
+                  {t === "block" ? "Block" : t === "theme" ? "Theme" : "AI"}
                 </button>
               ))}
             </div>

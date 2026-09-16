@@ -71,6 +71,9 @@ export async function POST(request: Request) {
         // Nothing to do but write: no file access, no shell, one turn.
         allowedTools: [],
         maxTurns: 1,
+        // A deployed function has no writable home directory, so point the
+        // runtime's config at the one place it can write.
+        env: IS_LOCAL ? process.env : { ...process.env, ANTHROPIC_CONFIG_DIR: "/tmp/claude" },
         // Don't pick up this project's own settings or CLAUDE.md — they're
         // about building Sitebuilder, not about the site being written.
         settingSources: [],

@@ -58,6 +58,9 @@ export async function POST(request: Request) {
         systemPrompt: EDIT_PROMPT,
         allowedTools: [],
         maxTurns: 1,
+        // A deployed function has no writable home directory, so point the
+        // runtime's config at the one place it can write.
+        env: IS_LOCAL ? process.env : { ...process.env, ANTHROPIC_CONFIG_DIR: "/tmp/claude" },
         settingSources: [],
       },
     });
