@@ -969,40 +969,57 @@ export default function Editor() {
               )}
             </div>
 
-            {liveAddress && (
-              <footer className="border-t border-slate-200 bg-slate-50 px-3 py-2.5">
-                <div className="flex items-center gap-1.5">
-                  <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
-                  <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-                    Live at
-                  </span>
-                </div>
-                <div className="mt-1 flex items-center gap-1.5">
-                  <a
-                    href={liveAddress.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    title={liveAddress.url}
-                    className="min-w-0 flex-1 truncate font-mono text-[11px] text-indigo-700 hover:underline"
-                  >
-                    {liveAddress.url.replace(/^https?:\/\//, "").replace(/\/$/, "")}
-                  </a>
-                  <Tip label="Copy the address">
-                    <button
-                      onClick={async () => {
-                        if (await copyText(liveAddress.url)) {
-                          setLinkCopied(true);
-                          window.setTimeout(() => setLinkCopied(false), 1600);
-                        }
-                      }}
-                      className="shrink-0 rounded border border-slate-300 bg-white px-1.5 py-0.5 text-[10px] font-medium text-slate-700 transition hover:bg-slate-100"
+            {/* Always says where the site stands, so the corner is never a
+                blank space you have to guess about. */}
+            <footer className="border-t border-slate-200 bg-slate-50 px-3 py-2.5">
+              {liveAddress ? (
+                <>
+                  <div className="flex items-center gap-1.5">
+                    <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
+                    <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                      Live at
+                    </span>
+                  </div>
+                  <div className="mt-1 flex items-center gap-1.5">
+                    <a
+                      href={liveAddress.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title={liveAddress.url}
+                      className="min-w-0 flex-1 truncate font-mono text-[11px] text-indigo-700 hover:underline"
                     >
-                      {linkCopied ? "Copied ✓" : "Copy"}
-                    </button>
-                  </Tip>
+                      {liveAddress.url.replace(/^https?:\/\//, "").replace(/\/$/, "")}
+                    </a>
+                    <Tip label="Copy the address">
+                      <button
+                        onClick={async () => {
+                          if (await copyText(liveAddress.url)) {
+                            setLinkCopied(true);
+                            window.setTimeout(() => setLinkCopied(false), 1600);
+                          }
+                        }}
+                        className="shrink-0 rounded border border-slate-300 bg-white px-1.5 py-0.5 text-[10px] font-medium text-slate-700 transition hover:bg-slate-100"
+                      >
+                        {linkCopied ? "Copied ✓" : "Copy"}
+                      </button>
+                    </Tip>
+                  </div>
+                </>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-slate-300" />
+                  <span className="min-w-0 flex-1 text-[11px] leading-tight text-slate-500">
+                    Not online yet
+                  </span>
+                  <button
+                    onClick={() => setShowPublish(true)}
+                    className="shrink-0 rounded border border-slate-300 bg-white px-1.5 py-0.5 text-[10px] font-medium text-indigo-700 transition hover:bg-slate-100"
+                  >
+                    Put it online
+                  </button>
                 </div>
-              </footer>
-            )}
+              )}
+            </footer>
           </aside>
         </div>
       </div>
