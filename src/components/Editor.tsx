@@ -17,6 +17,7 @@ import {
   type SavedProject,
 } from "@/lib/projects";
 import { useDialog, useDialogOpen } from "./Dialogs";
+import AiChat from "./AiChat";
 import FormatBar, { type Command, type SelectionState } from "./FormatBar";
 import Logo from "./Logo";
 import {
@@ -74,7 +75,7 @@ export default function Editor() {
   const [site, setSite] = useState<Site>(emptySite);
   const [activePageId, setActivePageId] = useState<string>("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [tab, setTab] = useState<"block" | "theme">("block");
+  const [tab, setTab] = useState<"block" | "theme" | "claude">("block");
   const [device, setDevice] = useState<"desktop" | "mobile">("desktop");
   const [loaded, setLoaded] = useState(false);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
@@ -1147,7 +1148,7 @@ export default function Editor() {
           {/* Right: inspector */}
           <aside className="flex w-72 shrink-0 flex-col border-l border-slate-200 bg-white">
             <div className="flex border-b border-slate-200">
-              {(["block", "theme"] as const).map((t) => (
+              {(["block", "theme", "claude"] as const).map((t) => (
                 <button
                   key={t}
                   onClick={() => setTab(t)}
@@ -1157,13 +1158,22 @@ export default function Editor() {
                       : "border-transparent text-slate-500 hover:text-slate-700"
                   }`}
                 >
-                  {t === "block" ? "Block" : "Theme"}
+                  {t === "block" ? "Block" : t === "theme" ? "Theme" : "Claude"}
                 </button>
               ))}
             </div>
 
             <div className="flex-1 overflow-y-auto p-3.5">
-              {tab === "theme" ? (
+              {tab === "claude" ? (
+                <AiChat
+                  site={site}
+                  pageId={activePage?.id ?? ""}
+                  onRevised={(next) => {
+                    setSite(next);
+                    setSelectedId(null);
+                  }}
+                />
+              ) : tab === "theme" ? (
                 <FieldList
                   fields={THEME_FIELDS}
                   values={site.theme as unknown as Record<string, unknown>}

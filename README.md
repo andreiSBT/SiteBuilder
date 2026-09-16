@@ -18,6 +18,21 @@ On the start screen, describe what the site is for and Claude writes the blocks:
 sentences about your subject, a colour and font that suit it, and a page you can then edit
 like any other. It takes about half a minute.
 
+### Talking to it about the page
+
+The right-hand panel has a **Claude** tab: ask for a change to the page you're looking at
+and it happens. "Make the headline shorter", "add a section about how to get there",
+"something calmer than the orange". Each answer comes with **Undo**.
+
+It's **stateless on purpose**. Every message sends the page exactly as it stands, rather
+than Claude remembering what it wrote last time — so anything you typed by hand in between
+counts, and the conversation can't drift away from what's actually on screen.
+
+Text is sent with its formatting tags intact and comes back through `sanitizeRich()`, so a
+word you bolded yourself stays bold through an edit that wasn't about it. The reply is
+checked against the same schema and mapped onto real blocks, so a change it invents can't
+produce a block this builder doesn't have.
+
 ### On your subscription, not an API key
 
 A **Claude Pro or Max plan doesn't include the API** — the API is billed separately

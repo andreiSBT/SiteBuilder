@@ -120,6 +120,65 @@ export function aiPageToSite(page: AiPage): Site {
   };
 }
 
+/**
+ * Describe the page as it stands right now, so Claude changes what's actually
+ * on screen rather than what it wrote last time.
+ *
+ * Text is sent as stored, formatting tags and all. They survive the round trip
+ * through sanitizeRich(), so a bolded word stays bold unless the change is
+ * about that word.
+ */
+export function siteToAiPage(site: Site, pageId: string): AiPage {
+  const page = site.pages.find((p) => p.id === pageId) ?? site.pages[0];
+  const blocks = (page?.blocks ?? []).map((block) => {
+    const p = block.props as Record<string, string | undefined>;
+    const item: Record<string, unknown> = { type: block.type };
+    for (const key of ["heading", "subheading", "text", "buttonText", "title", "alt", "caption"]) {
+      if (typeof p[key] === "string" && p[key]) item[key] = p[key];
+    }
+    if (block.type === "features" && Array.isArray(block.props.items)) {
+      item.cards = (block.props.items as Record<string, string>[]).map((card) => ({
+        icon: card.icon ?? "",
+        title: card.title ?? "",
+        body: card.body ?? "",
+      }));
+    }
+    return item;
+  });
+
+  return {
+    title: site.title,
+    accent: site.theme.accent,
+    font: site.theme.font,
+    blocks,
+  } as AiPage;
+}
+
+/** Put a revised page back, keeping everything the change wasn't about. */
+export function applyAiPage(site: Site, pageId: string, revised: AiPage): Site {
+  const rebuilt = aiPageToSite(revised);
+  return {
+    ...site,
+    title: rebuilt.title,
+    theme: { ...site.theme, accent: rebuilt.theme.accent, font: rebuilt.theme.font },
+    pages: site.pages.map((page) =>
+      page.id === pageId ? { ...page, blocks: rebuilt.pages[0].blocks } : page
+    ),
+  };
+}
+
+export const EDIT_PROMPT = `You are changing a page someone is looking at right now.
+
+They send you the page as it stands and one instruction. Return the whole page back in the
+same shape, with that instruction carried out and **everything else left exactly as it
+was** — same words, same order, same blocks. Don't rewrite what wasn't mentioned, and
+don't add blocks nobody asked for.
+
+Text may contain simple formatting tags like <strong> or <span style="color:#e11d48">.
+Keep them unless the instruction is about that formatting.
+
+If the instruction is vague, make the smallest sensible change rather than starting over.`;
+
 export const SYSTEM_PROMPT = `You write the contents of a small website, as blocks.
 
 The person describes what the site is for. Give them a page that is worth showing to
