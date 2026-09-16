@@ -5,6 +5,7 @@ import { BLOCKS, BLOCK_ORDER, FONT_OPTIONS, newBlock } from "@/lib/blocks";
 import { exportHtml, previewHtml } from "@/lib/render";
 import { copyText } from "@/lib/clipboard";
 import { canShareByLink, encodeSiteLink } from "@/lib/shareLink";
+import { recallKey, updateLiveSite } from "@/lib/liveClient";
 import { richToText, sanitizeRich } from "@/lib/sanitize";
 import { emptySite, migrate, newPage, projectFromHtml, uniqueSlug } from "@/lib/site";
 import type { Block, BlockType, Field, Page, Site } from "@/lib/types";
@@ -86,6 +87,7 @@ export default function Editor() {
   const [externalHref, setExternalHref] = useState<string | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
+  const [liveStatus, setLiveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [saved, setSaved] = useState<SavedProject[]>([]);
   const [projectId, setProjectId] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<"idle" | "saved" | "error">("idle");
@@ -553,6 +555,24 @@ export default function Editor() {
   };
 
   /**
+   * Keep a site hosted here in step with what's on screen.
+   *
+   * Waits for a pause in the typing rather than firing on every keystroke, so a
+   * sentence is one upload instead of forty.
+   */
+  const liveId = site.published?.live?.id;
+  useEffect(() => {
+    if (!loaded || !liveId || !recallKey(liveId)) return;
+    const timer = window.setTimeout(async () => {
+      setLiveStatus("saving");
+      const ok = await updateLiveSite(liveId, exportHtml(site, { embedProject: true }));
+      setLiveStatus(ok ? "saved" : "error");
+      if (ok) window.setTimeout(() => setLiveStatus("idle"), 2000);
+    }, 2500);
+    return () => window.clearTimeout(timer);
+  }, [site, liveId, loaded]);
+
+  /**
    * Build a share link and copy it, right now.
    *
    * Never stored: the link carries the site inside it, so a saved one would be
@@ -998,6 +1018,19 @@ export default function Editor() {
                     <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
                       Live at
                     </span>
+                    {liveId && liveStatus !== "idle" && (
+                      <span
+                        className={`text-[10px] ${
+                          liveStatus === "error" ? "text-rose-500" : "text-slate-400"
+                        }`}
+                      >
+                        {liveStatus === "saving"
+                          ? "· updating…"
+                          : liveStatus === "saved"
+                            ? "· up to date"
+                            : "· couldn't update"}
+                      </span>
+                    )}
                   </div>
                   <div className="mt-1 flex items-center gap-1.5">
                     <a

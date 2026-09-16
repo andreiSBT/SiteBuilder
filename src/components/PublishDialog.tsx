@@ -6,11 +6,12 @@ import { normalizeUrl } from "@/lib/blocks";
 import { projectSlug } from "@/lib/publishShared";
 import { copyText as copy } from "@/lib/clipboard";
 import { canShareByLink, encodeSiteLink } from "@/lib/shareLink";
+import { createLiveSite } from "@/lib/liveClient";
 import { timeAgo } from "@/lib/projects";
 import type { Site } from "@/lib/types";
 import { exportHtml } from "@/lib/render";
 
-type Host = "link" | "drop" | "vercel" | "github";
+type Host = "live" | "link" | "vercel" | "github";
 
 type Result = {
   url: string;
@@ -42,17 +43,17 @@ const HOSTS: Record<
     nameLabel?: string;
   }
 > = {
+  live: {
+    name: "Live",
+    blurb:
+      "Puts your site on Sitebuilder itself and gives you a short address. No sign-up, and it keeps up with your edits — change something here and the page changes too.",
+    lasts: "Stays up · updates while you edit",
+  },
   link: {
     name: "Just a link",
     blurb:
       "The whole site is packed into the link itself. Press the button, send the link, done — no sign-up, nothing stored anywhere, and it never expires.",
-    lasts: "Never expires · nothing is stored · the link is long",
-  },
-  drop: {
-    name: "No account",
-    blurb:
-      "Drag your site onto a drop page and it's online in seconds. Nothing to sign up for.",
-    lasts: "Live for 60 minutes, counted from the moment you drop it",
+    lasts: "Never expires · a frozen copy, so edits won't show",
   },
   vercel: {
     name: "Vercel",
@@ -78,7 +79,7 @@ const HOSTS: Record<
  * support says the no-account path fails often enough that they recommend
  * signing up — a button that usually errors is worse than no button.
  */
-const DROP = { name: "Cloudflare Drop", url: "https://www.cloudflare.com/drop/" };
+
 
 export default function PublishDialog({
   site,
@@ -87,10 +88,10 @@ export default function PublishDialog({
 }: {
   site: Site;
   /** Remembers the address, so it isn't lost when this closes. */
-  onPublished: (host: string, record: { url: string; repoUrl?: string }) => void;
+  onPublished: (host: string, record: { url: string; repoUrl?: string; id?: string }) => void;
   onClose: () => void;
 }) {
-  const [host, setHost] = useState<Host>(canShareByLink() ? "link" : "drop");
+  const [host, setHost] = useState<Host>("live");
   const [token, setToken] = useState("");
   const [remember, setRemember] = useState(false);
   const [name, setName] = useState(projectSlug(site.title));
@@ -98,14 +99,10 @@ export default function PublishDialog({
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<Result | null>(null);
   const [copied, setCopied] = useState(false);
-  const [dropped, setDropped] = useState(false);
   const [shareLink, setShareLink] = useState<string | null>(null);
   const [ownAddress, setOwnAddress] = useState("");
-
-  /** Each host has its own token, and its own result to forget. */
   const switchHost = (next: Host) => {
     setHost(next);
-    setDropped(false);
     setShareLink(null);
     setToken(readToken(next));
     setRemember(!!readToken(next));
@@ -145,8 +142,8 @@ export default function PublishDialog({
 
   const alreadyPublished = Object.entries(site.published ?? {}).sort((a, b) => b[1].at - a[1].at);
   const tabs: Host[] = canShareByLink()
-    ? ["link", "drop", "vercel", "github"]
-    : ["drop", "vercel", "github"];
+    ? ["live", "link", "vercel", "github"]
+    : ["live", "vercel", "github"];
   const info = HOSTS[host];
 
   /** Record an address the app had no way of learning on its own. */
@@ -164,6 +161,21 @@ export default function PublishDialog({
     }
   };
 
+  /** Put the site on this app's own storage, at an address that stays put. */
+  const publishLive = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const live = await createLiveSite(exportHtml(site, { embedProject: true }), site.title);
+      setResult({ url: live.url });
+      onPublished("live", { url: live.url, id: live.id });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't put it online.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   /** Pack the whole site into a link. Nothing is uploaded. */
   const makeLink = async () => {
     setBusy(true);
@@ -177,19 +189,6 @@ export default function PublishDialog({
     } finally {
       setBusy(false);
     }
-  };
-
-  /** Save the file, then open the drop page to drag it onto. */
-  const startDrop = (url: string) => {
-    const blob = new Blob([exportHtml(site, { embedProject: true })], { type: "text/html" });
-    const href = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = href;
-    link.download = `${name || "site"}.html`;
-    link.click();
-    URL.revokeObjectURL(href);
-    window.open(url, "_blank", "noopener,noreferrer");
-    setDropped(true);
   };
 
   return createPortal(
@@ -287,7 +286,39 @@ export default function PublishDialog({
         <p className="mt-3 text-xs leading-relaxed text-slate-600">{info.blurb}</p>
         <p className="mt-1 text-[11px] text-slate-400">{info.lasts}</p>
 
-        {host === "link" ? (
+        {host === "live" ? (
+          result ? (
+            <Success result={result} copied={copied} onCopy={() => copyText(result.url)} />
+          ) : (
+            <div className="mt-4">
+              <p className="text-xs leading-relaxed text-slate-600">
+                One button. Your page gets a short address on this site, and stays at that
+                same address — so a link you&apos;ve already sent keeps working, and shows
+                your latest version.
+              </p>
+              {error && (
+                <p className="mt-3 rounded-md bg-rose-50 px-3 py-2 text-xs leading-relaxed text-rose-700">
+                  {error}
+                </p>
+              )}
+              <div className="mt-4 flex justify-end gap-2">
+                <button
+                  onClick={onClose}
+                  className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={publishLive}
+                  disabled={busy}
+                  className="rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-40"
+                >
+                  {busy ? "Putting it online…" : "Put it online"}
+                </button>
+              </div>
+            </div>
+          )
+        ) : host === "link" ? (
           <div className="mt-4">
             {shareLink ? (
               <>
@@ -340,52 +371,6 @@ export default function PublishDialog({
                 {error}
               </p>
             )}
-          </div>
-        ) : host === "drop" ? (
-          <div className="mt-4">
-            <ol className="flex flex-col gap-1.5 text-xs leading-relaxed text-slate-600">
-              <li>
-                <b className="text-slate-800">1.</b> We save your site as one file.
-              </li>
-              <li>
-                <b className="text-slate-800">2.</b> The drop page opens in a new tab.
-              </li>
-              <li>
-                <b className="text-slate-800">3.</b> Drag the file onto it — that&apos;s it.
-              </li>
-            </ol>
-
-            <p className="mt-3 rounded-md bg-amber-50 px-3 py-2 text-[11px] leading-relaxed text-amber-900">
-              <b>What the hour means:</b> the link works for anyone, straight away, for 60
-              minutes. Inside that hour you can press <b>Claim</b> to sign in and keep it
-              for good, on the same address. If you don&apos;t, the link stops working —
-              and dropping the file again gives you a <i>different</i> address, so anything
-              you&apos;ve already sent people goes dead. Good for showing someone now; use
-              GitHub or Vercel for a link you want to keep.
-            </p>
-
-            {dropped && (
-              <p className="mt-3 rounded-md bg-emerald-50 px-3 py-2 text-[11px] leading-relaxed text-emerald-800">
-                Saved to your downloads, and the drop page is open. Drag{" "}
-                <code className="font-mono">{name || "site"}.html</code> onto it. The
-                countdown starts then.
-              </p>
-            )}
-
-            <div className="mt-4 flex flex-wrap justify-end gap-2">
-              <button
-                onClick={onClose}
-                className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
-              >
-                Close
-              </button>
-              <button
-                onClick={() => startDrop(DROP.url)}
-                className="rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-indigo-700"
-              >
-                Save &amp; open {DROP.name}
-              </button>
-            </div>
           </div>
         ) : result ? (
           <Success result={result} copied={copied} onCopy={() => copyText(result.url)} />

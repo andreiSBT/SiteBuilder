@@ -267,52 +267,50 @@ want it in the real export too.
 **Publish** in the toolbar puts the finished site on the internet. Four choices, easiest
 first:
 
-- **Just a link** — the whole site is compressed into the link itself. One button, no
-  sign-up, nothing stored anywhere, never expires. The catch is the length: a three-page
-  site is about 4,000 characters. Fine to paste into a message, too long to read out.
-- **No account** — saves the file and opens [Cloudflare Drop](https://www.cloudflare.com/drop/);
-  drag the file on and it's live in seconds. See "What the hour means" below.
-- **Vercel** — live in a few seconds on a free `*.vercel.app` address.
-- **GitHub** — creates a public repository, uploads `index.html`, and switches on GitHub
-  Pages at `https://<you>.github.io/<repo>/`. The code and the site both live there.
-  GitHub takes a minute or two to build it the first time.
+- **Live** — one button, no sign-up. The page goes on Sitebuilder itself at a short address
+  like `/site/my-portfolio-348511`, and **keeps up with your edits**: change something and
+  the page changes too, at the same address, so a link you already sent stays right.
+- **Just a link** — the site compressed into the link itself. Nothing stored anywhere, never
+  expires, but it's a *frozen copy*: edits made afterwards don't show in a link already sent.
+- **Vercel** / **GitHub** — onto your own account, with a token. GitHub also keeps the code.
 
-Publishing again reuses the same project or repository and updates it, so a link you've
-already given someone keeps working.
+Cloudflare Drop used to be here as the no-account option. **Live** is that, but permanent
+and self-updating, so Drop was only ever the worse choice and it's gone.
 
-### How the link can hold a whole site
+### How Live works
 
-`src/lib/shareLink.ts` compresses the exported HTML (deflate, via the browser's own
-`CompressionStream`) and writes it into the URL's **fragment** — the part after `#`.
-Fragments are never sent to a server, so the site only ever exists in the two browsers
-that open the link. Nothing is uploaded, so there's nothing to pay for, moderate, or
-expire.
+```
+POST /api/site   → stores the page, returns { id, editKey, url }
+PUT  /api/site   → replaces it, if you have the key
+GET  /site/<id>  → serves it
+```
 
-`/s` reads the fragment back and renders it **in a sandboxed iframe from a blob URL**, not
-into its own document. That part matters: anyone can put anything in a link, and `/s`
-shares an origin with the builder — so a crafted link must not be able to reach the
-builder's saved tokens. The sandbox gives the frame an opaque origin with no access to
-this one.
+Pages live in a private Vercel Blob store. Private, not public, on purpose: the serving
+route reads with `useCache: false`, so an edit is visible **immediately** — a public blob
+can serve up to a minute stale, which would make a page look broken right after you changed
+it.
 
-This is the only option that needs no account *and* doesn't expire. The cost is paid in
-link length instead of money.
+The **edit key is never stored anywhere.** It's an HMAC of the id with a server-side secret
+(`SITE_EDIT_SECRET`), so the server can recognise a real one without keeping a list, and
+there's no key sitting in the store to be read. The browser keeps its copy in
+`localStorage`, deliberately *not* in the project — otherwise anyone you sent the `.html`
+to could overwrite your live page.
 
-### What the hour means
+Updates wait for a **pause in the typing** (2.5s) rather than firing per keystroke, so a
+sentence is one upload rather than forty. The corner shows "updating…" then "up to date".
 
-The clock starts the moment the file lands on the drop page, not when you press the button
-here.
+### If someone puts something bad up there
 
-- For those 60 minutes the URL is live and works for anyone you send it to.
-- Press **Claim** inside that hour to sign in and keep it permanently — same address.
-- If you don't, the link stops working. Dropping the file again gives a **different**
-  address, so any link you already sent is dead.
+Anyone who can reach the app can publish a page on your domain — that's the cost of "no
+account". Pages are capped at 2MB. To see what's there and remove something:
 
-So: fine for showing someone right now, no good for a link you want to keep.
+```bash
+vercel blob list --prefix sites/     # everything published
+vercel blob del sites/<id>.html      # take one down
+```
 
-Only Cloudflare Drop is offered. Netlify Drop takes anonymous uploads too, but
-[their own support](https://answers.netlify.com/t/netlify-drop-login-required/19765) says
-the no-account path fails often enough that they recommend signing up — a button that
-usually errors is worse than no button.
+If it's ever a real problem, Vercel's Firewall can rate-limit `/api/site` without touching
+the rest of the app.
 
 ### The address is remembered
 

@@ -38,6 +38,8 @@ export type Page = {
 export type PublishedRecord = {
   url: string;
   repoUrl?: string;
+  /** Set for sites hosted here, so they can be updated in place. */
+  id?: string;
   at: number;
 };
 
