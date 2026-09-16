@@ -1,4 +1,5 @@
 import { BLOCKS, FONT_STACKS, esc } from "./blocks";
+import { blockDragScript } from "./dragBlocks";
 import { inlineEditorScript } from "./inlineEditor";
 import type { Page, Site } from "./types";
 
@@ -324,6 +325,43 @@ ${siteCss(site)}
 .sb-pick { position: relative; }
 .sb-pick:hover { outline: 1px dashed color-mix(in srgb, var(--accent) 35%, transparent); outline-offset: -1px; }
 .sb-pick[data-selected="true"] { outline: 2px solid color-mix(in srgb, var(--accent) 60%, transparent); outline-offset: -2px; }
+/* Grab here to move a block. Kept to the top-right corner, where left-aligned
+   text almost never is, and only visible on the block you're pointing at. */
+.sb-handle {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 11px;
+  line-height: 1;
+  cursor: grab;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.25);
+  user-select: none;
+  /* Pointer events only — without this a touch drag scrolls the page instead. */
+  touch-action: none;
+  z-index: 5;
+}
+.sb-pick:hover > .sb-handle,
+.sb-pick[data-selected="true"] > .sb-handle { opacity: 1; }
+.sb-handle:active { cursor: grabbing; }
+.sb-pick[data-dragging="true"] { opacity: 0.4; }
+.sb-dropline {
+  position: absolute;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--accent);
+  pointer-events: none;
+  z-index: 10;
+}
+.sb-dropline[hidden] { display: none; }
 /* Text you can type straight into. */
 [data-edit] { cursor: text; border-radius: 3px; }
 [data-edit]:hover { box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 22%, transparent); }
@@ -344,7 +382,7 @@ ${navHtml(site, page.slug)}<main>
 ${pageBlocks(page, site, true)}
     </section>
 </main>
-${inlineEditorScript()}<script>
+${inlineEditorScript()}${blockDragScript()}<script>
 (function () {
   var selected = ${JSON.stringify(selectedId)};
   if (selected) {

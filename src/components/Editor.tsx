@@ -112,6 +112,22 @@ export default function Editor() {
   const rebuildWhenDone = useRef(false);
   const [rebuildTick, setRebuildTick] = useState(0);
   const [previewDoc, setPreviewDoc] = useState("");
+  // A block type on its way from the palette onto the page.
+  const paletteDrag = useRef<{
+    type: BlockType;
+    pointerId: number;
+    startX: number;
+    startY: number;
+    moved: boolean;
+  } | null>(null);
+  const [dragGhost, setDragGhost] = useState<{ type: BlockType; x: number; y: number } | null>(null);
+  // Where the blocks are inside the frame, asked for when a palette drag starts.
+  const frameBlocks = useRef<{ id: string; top: number; bottom: number }[]>([]);
+  const dropSlot = useRef<number | null>(null);
+  // A ref as well as state: the rebuild effect needs to read this without being
+  // re-created, and the toolbar needs to re-render when it changes.
+  const dragInFrame = useRef(false);
+  const [draggingInFrame, setDraggingInFrame] = useState(false);
   const dialogOpen = useDialogOpen();
 
   // Restore the last session, if there is one. localStorage doesn't exist while
@@ -189,6 +205,36 @@ export default function Editor() {
           rebuildWhenDone.current = false;
           setRebuildTick((tick) => tick + 1);
         }
+      } else if (data?.type === "sb:move") {
+        // A block was dragged somewhere else on the page. Done with setSite
+        // rather than the page helpers because this listener is registered once
+        // and would otherwise be holding a stale page.
+        const { id, slot } = data;
+        if (typeof id !== "string" || typeof slot !== "number") return;
+        setSite((s) => ({
+          ...s,
+          pages: s.pages.map((page) => {
+            const from = page.blocks.findIndex((b) => b.id === id);
+            if (from === -1) return page;
+            const next = [...page.blocks];
+            const [moved] = next.splice(from, 1);
+            // Lifting the block out shifts every slot below it up by one.
+            next.splice(slot > from ? slot - 1 : slot, 0, moved);
+            return { ...page, blocks: next };
+          }),
+        }));
+        setSelectedId(id);
+      } else if (data?.type === "sb:dragging") {
+        dragInFrame.current = !!data.active;
+        setDraggingInFrame(!!data.active);
+        // A move that arrived mid-drag was held back; now the drag is over, the
+        // document can be rebuilt with the blocks in their new order.
+        if (!data.active && rebuildWhenDone.current) {
+          rebuildWhenDone.current = false;
+          setRebuildTick((tick) => tick + 1);
+        }
+      } else if (data?.type === "sb:blocks") {
+        frameBlocks.current = Array.isArray(data.blocks) ? data.blocks : [];
       } else if (data?.type === "sb:sel") {
         if (!data.active) {
           setSelection(null);
@@ -273,6 +319,18 @@ export default function Editor() {
       const index = type === "footer" || at === -1 ? page.blocks.length : at + 1;
       const next = [...page.blocks];
       next.splice(index, 0, block);
+      return { ...page, blocks: next };
+    });
+    setSelectedId(block.id);
+    setTab("block");
+  };
+
+  /** Drop a new block into a particular gap, rather than after the selection. */
+  const insertBlockAt = (type: BlockType, slot: number) => {
+    const block = newBlock(type);
+    updateActivePage((page) => {
+      const next = [...page.blocks];
+      next.splice(Math.max(0, Math.min(slot, next.length)), 0, block);
       return { ...page, blocks: next };
     });
     setSelectedId(block.id);
@@ -511,7 +569,9 @@ export default function Editor() {
       skipPreviewRebuild.current = false;
       return;
     }
-    if (editingInFrame.current) {
+    if (editingInFrame.current || dragInFrame.current) {
+      // Replacing the document mid-drag would take away the very handle the
+      // pointer is holding, so this waits until the drag lets go.
       rebuildWhenDone.current = true;
       return;
     }
@@ -533,6 +593,104 @@ export default function Editor() {
   const sendCommand = useCallback((command: Command) => {
     previewFrame.current?.contentWindow?.postMessage(command, "*");
   }, []);
+
+  /** Anything else the frame should do — kept apart from text formatting. */
+  const sendFrame = useCallback((cmd: Record<string, unknown>) => {
+    previewFrame.current?.contentWindow?.postMessage({ type: "sb:cmd", ...cmd }, "*");
+  }, []);
+
+  /**
+   * Dragging a block type out of the palette and onto the page.
+   *
+   * The pointer is captured here rather than in the frame: once it crosses into
+   * the iframe the frame would otherwise swallow the movement, and a sandboxed
+   * frame can't be relied on to read a dataTransfer set out here. So the app
+   * follows the pointer itself, works out which gap it's over from the geometry
+   * the frame reported, and tells the frame where to draw the line.
+   */
+  const paletteHandlers = (type: BlockType) => ({
+    onPointerDown: (e: React.PointerEvent<HTMLButtonElement>) => {
+      if (e.button !== 0) return;
+      paletteDrag.current = {
+        type,
+        pointerId: e.pointerId,
+        startX: e.clientX,
+        startY: e.clientY,
+        moved: false,
+      };
+      e.currentTarget.setPointerCapture(e.pointerId);
+    },
+    onPointerMove: (e: React.PointerEvent<HTMLButtonElement>) => {
+      const drag = paletteDrag.current;
+      if (!drag || drag.pointerId !== e.pointerId) return;
+
+      // A few pixels of slack, so a slightly wobbly click is still a click.
+      if (!drag.moved) {
+        if (Math.hypot(e.clientX - drag.startX, e.clientY - drag.startY) < 5) return;
+        drag.moved = true;
+        sendFrame({ cmd: "dragProbe" });
+      }
+      setDragGhost({ type: drag.type, x: e.clientX, y: e.clientY });
+
+      const box = previewFrame.current?.getBoundingClientRect();
+      const inside =
+        box &&
+        e.clientX >= box.left &&
+        e.clientX <= box.right &&
+        e.clientY >= box.top &&
+        e.clientY <= box.bottom;
+      if (!box || !inside) {
+        dropSlot.current = null;
+        sendFrame({ cmd: "dropLine", index: null });
+        return;
+      }
+
+      // The frame reported its own coordinates, so take its corner off first.
+      const y = e.clientY - box.top;
+
+      // Held near an edge, walk the page along — otherwise a long page could
+      // only take a drop somewhere already on screen. The frame sends fresh
+      // geometry back each time it moves.
+      const margin = 60;
+      if (y < margin) sendFrame({ cmd: "scrollBy", by: -14 });
+      else if (y > box.height - margin) sendFrame({ cmd: "scrollBy", by: 14 });
+
+      const list = frameBlocks.current;
+      let slot = list.length;
+      for (let i = 0; i < list.length; i++) {
+        if (y < list[i].top + (list[i].bottom - list[i].top) / 2) {
+          slot = i;
+          break;
+        }
+      }
+      dropSlot.current = slot;
+      sendFrame({ cmd: "dropLine", index: slot });
+    },
+    onPointerUp: (e: React.PointerEvent<HTMLButtonElement>) => {
+      const drag = paletteDrag.current;
+      setDragGhost(null);
+      sendFrame({ cmd: "dropLine", index: null });
+      if (drag && drag.pointerId === e.pointerId && drag.moved && dropSlot.current !== null) {
+        insertBlockAt(drag.type, dropSlot.current);
+      }
+      dropSlot.current = null;
+      // Cleared after the click that follows has had its look at it.
+      window.setTimeout(() => {
+        paletteDrag.current = null;
+      }, 0);
+    },
+    onPointerCancel: () => {
+      paletteDrag.current = null;
+      setDragGhost(null);
+      dropSlot.current = null;
+      sendFrame({ cmd: "dropLine", index: null });
+    },
+    onClick: () => {
+      // A drag has already put the block where it was dropped; only a plain
+      // click should fall back to adding it after the selection.
+      if (!paletteDrag.current?.moved) addBlock(type);
+    },
+  });
 
   /**
    * A rich field edited in the panel. Push it into the frame and skip the
@@ -653,6 +811,19 @@ export default function Editor() {
             onOpenFile={() => fileInput.current?.click()}
             onCancel={isFirstRun ? undefined : () => setShowStart(false)}
           />
+        )}
+
+        {/* Follows the pointer while a block type is being carried out of the
+            palette, so it's obvious something is being dragged rather than
+            clicked. */}
+        {dragGhost && (
+          <div
+            className="pointer-events-none fixed z-[120] flex items-center gap-1.5 rounded-md border border-indigo-300 bg-white px-2 py-1 text-[11px] font-medium text-slate-700 shadow-lg"
+            style={{ left: dragGhost.x + 12, top: dragGhost.y + 12 }}
+          >
+            <span className="text-indigo-600">{BLOCKS[dragGhost.type].icon}</span>
+            {BLOCKS[dragGhost.type].name}
+          </div>
         )}
 
         {showPublish && (
@@ -863,10 +1034,10 @@ export default function Editor() {
             <Section title="Add a block">
               <div className="grid grid-cols-2 gap-1.5">
                 {BLOCK_ORDER.map((type) => (
-                  <Tip key={type} label={BLOCKS[type].description}>
+                  <Tip key={type} label={`${BLOCKS[type].description} — click to add, or drag onto the page`}>
                     <button
-                      onClick={() => addBlock(type)}
-                      className="flex flex-col items-start gap-0.5 rounded-md border border-slate-200 px-2 py-1.5 text-left transition hover:border-indigo-400 hover:bg-indigo-50"
+                      {...paletteHandlers(type)}
+                      className="flex touch-none flex-col items-start gap-0.5 rounded-md border border-slate-200 px-2 py-1.5 text-left transition hover:border-indigo-400 hover:bg-indigo-50"
                     >
                       <span className="text-base leading-none text-indigo-600">
                         {BLOCKS[type].icon}
@@ -944,7 +1115,12 @@ export default function Editor() {
               className="mx-auto h-full rounded-xl bg-white shadow-lg ring-1 ring-slate-300/60 transition-all"
               style={{ maxWidth: device === "mobile" ? 390 : 1200 }}
             >
-              {selection?.active && selection.rich && !showPreview && !showStart && !showPublish && (
+              {selection?.active &&
+                selection.rich &&
+                !draggingInFrame &&
+                !showPreview &&
+                !showStart &&
+                !showPublish && (
                 <FormatBar
                   selection={selection}
                   inheritedFontLabel={`Theme font (${
