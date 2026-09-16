@@ -326,6 +326,16 @@ online yet" with a *Put it online* button before you publish, and a green dot wi
 address and a Copy button after. Never a blank space you have to guess about. The panel
 scrolls under it; the corner stays put.
 
+Publishing with a token records the address by itself. The other routes can't: the drop
+page hands *you* the URL, not the app, and a site published before any of this existed
+left no record. So the dialog has a **"Already put it online somewhere?"** box — paste the
+address, press Remember, and the corner shows it from then on. A bare host like
+`example.pages.dev` is fine; it goes through the same `normalizeUrl()` as any link.
+
+The share link isn't recorded, and shouldn't be: it *contains* the site, so storing it in
+the site would make the next link bigger, and the one after that bigger again. Press the
+button and it's rebuilt exactly.
+
 It travels inside the project, so it survives a reload, and comes back when you reopen the
 downloaded `.html`. Visitors never see it: it lives in the embedded project block, not the
 page. The share link isn't listed there, because pressing the button again rebuilds exactly

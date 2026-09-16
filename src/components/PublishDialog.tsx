@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { createPortal } from "react-dom";
+import { normalizeUrl } from "@/lib/blocks";
 import { projectSlug } from "@/lib/publishShared";
 import { copyText as copy } from "@/lib/clipboard";
 import { canShareByLink, encodeSiteLink } from "@/lib/shareLink";
@@ -99,6 +100,7 @@ export default function PublishDialog({
   const [copied, setCopied] = useState(false);
   const [dropped, setDropped] = useState(false);
   const [shareLink, setShareLink] = useState<string | null>(null);
+  const [ownAddress, setOwnAddress] = useState("");
 
   /** Each host has its own token, and its own result to forget. */
   const switchHost = (next: Host) => {
@@ -146,6 +148,14 @@ export default function PublishDialog({
     ? ["link", "drop", "vercel", "github"]
     : ["drop", "vercel", "github"];
   const info = HOSTS[host];
+
+  /** Record an address the app had no way of learning on its own. */
+  const rememberOwnAddress = () => {
+    const url = normalizeUrl(ownAddress);
+    if (!url.startsWith("http")) return;
+    onPublished("elsewhere", { url });
+    setOwnAddress("");
+  };
 
   const copyText = async (text: string) => {
     if (await copy(text)) {
@@ -230,7 +240,7 @@ export default function PublishDialog({
                     {record.url.replace(/^https?:\/\//, "")}
                   </a>
                   <span className="shrink-0 text-[10px] text-slate-400">
-                    {HOSTS[where as Host]?.name ?? where} · {timeAgo(record.at)}
+                    {HOSTS[where as Host]?.name ?? "Saved"} · {timeAgo(record.at)}
                   </span>
                   <button
                     onClick={() => copyText(record.url)}
@@ -243,6 +253,36 @@ export default function PublishDialog({
             </div>
           </div>
         )}
+
+        <div className="mt-3 rounded-md border border-dashed border-slate-300 p-2.5">
+          <label className="block text-[11px] font-medium text-slate-600">
+            Already put it online somewhere?
+          </label>
+          <p className="mt-0.5 text-[10px] leading-relaxed text-slate-400">
+            Paste the address — the drop page&apos;s, or anywhere else it lives — and
+            it&apos;ll be remembered in the corner.
+          </p>
+          <div className="mt-1.5 flex gap-1.5">
+            <input
+              value={ownAddress}
+              autoComplete="off"
+              spellCheck={false}
+              placeholder="example.pages.dev"
+              onChange={(e) => setOwnAddress(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") rememberOwnAddress();
+              }}
+              className="min-w-0 flex-1 rounded-md border border-slate-300 px-2 py-1 font-mono text-[11px] outline-none focus:border-indigo-500"
+            />
+            <button
+              onClick={rememberOwnAddress}
+              disabled={!normalizeUrl(ownAddress).startsWith("http")}
+              className="shrink-0 rounded-md border border-slate-300 px-2 py-1 text-[11px] font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-40"
+            >
+              Remember
+            </button>
+          </div>
+        </div>
 
         <p className="mt-3 text-xs leading-relaxed text-slate-600">{info.blurb}</p>
         <p className="mt-1 text-[11px] text-slate-400">{info.lasts}</p>
