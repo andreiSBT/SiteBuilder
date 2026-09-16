@@ -5,6 +5,7 @@ import { TEMPLATES } from "@/lib/templates";
 import { exportHtml } from "@/lib/render";
 import { timeAgo, type SavedProject } from "@/lib/projects";
 import type { Site } from "@/lib/types";
+import AiStarter from "./AiStarter";
 import Logo from "./Logo";
 import { Tip } from "./Tooltip";
 
@@ -60,6 +61,8 @@ export default function StartScreen({
             )}
           </div>
         </header>
+
+        <AiStarter onWritten={onPickTemplate} />
 
         {saved.length > 0 && (
           <section className="mb-10">

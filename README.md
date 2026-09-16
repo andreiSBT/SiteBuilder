@@ -12,6 +12,40 @@ npm run dev      # http://localhost:3000
 npm run build    # production build
 ```
 
+## Writing a site with Claude
+
+On the start screen, describe what the site is for and Claude writes the blocks: real
+sentences about your subject, a colour and font that suit it, and a page you can then edit
+like any other. It takes about half a minute.
+
+### On your subscription, not an API key
+
+A **Claude Pro or Max plan doesn't include the API** — the API is billed separately
+([why](https://support.claude.com/en/articles/9876003-i-have-a-paid-claude-subscription-pro-max-team-or-enterprise-plans-why-do-i-have-to-pay-separately-to-use-the-claude-api-and-console)).
+But a plan *does* include a monthly **Agent SDK credit**, and that explicitly covers
+third-party apps authenticating with your subscription
+([docs](https://support.claude.com/en/articles/15036540-use-the-claude-agent-sdk-with-your-claude-plan)).
+
+So this uses `@anthropic-ai/claude-agent-sdk`, not the API SDK. Nothing to paste, no card,
+and when the monthly credit runs out requests simply stop rather than quietly becoming a
+bill.
+
+### Why it's off on the deployed site
+
+The Agent SDK runs the Claude Code runtime as a local process and signs in as *you*. Two
+consequences: it only works where that runtime and your login exist — the machine you run
+the builder on — and if it ran on the public site, every visitor would be spending your
+credit. So the route answers `{ available: false }` in production and the panel doesn't
+appear. The SDK is `await import()`ed inside that guard, so its few megabytes never reach
+the deployed build either.
+
+### What comes back is not trusted
+
+Claude returns JSON, which is parsed, checked against a zod schema, and mapped onto real
+blocks with the builder's own defaults — so a field it invents is ignored rather than
+becoming a block. Every string still goes through `sanitizeRich()`, exactly like text typed
+by hand, and the block count and string lengths are capped.
+
 ## Templates
 
 The first time you open the app you get a **start screen**: five templates, or Blank.
