@@ -1,5 +1,6 @@
 import { jsonError } from "@/lib/publishShared";
 import { AiPageSchema, SYSTEM_PROMPT, aiPageToSite } from "@/lib/aiPage";
+import { checkBudget, recordSpend, visitorKey } from "@/lib/aiBudget";
 
 /**
  * Writes a page from a description, using the Claude Agent SDK.
@@ -8,12 +9,17 @@ import { AiPageSchema, SYSTEM_PROMPT, aiPageToSite } from "@/lib/aiPage";
  * key — a Pro or Max plan includes a monthly Agent SDK credit, and when that
  * runs out requests simply stop instead of quietly becoming a bill.
  *
- * It runs the Claude Code runtime as a local process, so this only works where
- * that runtime and its credentials exist: the machine you run the builder on.
- * On the deployed site it's off, which also means visitors can't spend someone
- * else's credit.
+ * On your own machine it uses the login already sitting there. Deployed, it
+ * needs CLAUDE_CODE_OAUTH_TOKEN — a long-lived subscription token from
+ * `claude setup-token` — and without one it stays off, so nobody can spend
+ * credit that was never offered.
+ *
+ * Because the deployed version spends the owner's credit on behalf of
+ * strangers, every public run goes through a daily money cap first.
  */
-const AVAILABLE = process.env.NODE_ENV !== "production";
+const HAS_TOKEN = !!(process.env.CLAUDE_CODE_OAUTH_TOKEN || process.env.ANTHROPIC_API_KEY);
+const IS_LOCAL = process.env.NODE_ENV !== "production";
+const AVAILABLE = IS_LOCAL || HAS_TOKEN;
 
 const MAX_PROMPT = 600;
 
@@ -24,9 +30,17 @@ export async function GET() {
 export async function POST(request: Request) {
   if (!AVAILABLE) {
     return jsonError(
-      "Writing with Claude only works when you run Sitebuilder on your own computer.",
+      "Writing with Claude isn't switched on here. It works when you run Sitebuilder yourself.",
       403
     );
+  }
+
+  // Only the public site is rationed: on your own machine it's your own credit
+  // and your own decision.
+  const visitor = visitorKey(request);
+  if (!IS_LOCAL) {
+    const verdict = await checkBudget(visitor);
+    if (!verdict.ok) return jsonError(verdict.reason, 429);
   }
 
   let body;
@@ -69,6 +83,7 @@ export async function POST(request: Request) {
           return jsonError("Claude couldn't finish that one. Try describing it differently.", 502);
         }
         text = message.result;
+        if (!IS_LOCAL) await recordSpend(visitor, message.total_cost_usd);
       }
     }
   } catch (error) {
