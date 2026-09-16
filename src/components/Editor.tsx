@@ -88,6 +88,14 @@ export default function Editor() {
   const [linkCopied, setLinkCopied] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
   const [liveStatus, setLiveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  // What the last check found, and which address it was for — so "checking" can
+  // be worked out rather than set, and a stale answer can't be shown for a new
+  // address.
+  const [checked, setChecked] = useState<{ url: string; online: boolean } | null>(null);
+  const [liveVersion, setLiveVersion] = useState(0);
+
+  // The most recent place this site was published, shown in the corner.
+  const liveAddress = Object.values(site.published ?? {}).sort((a, b) => b.at - a.at)[0] ?? null;
   const [saved, setSaved] = useState<SavedProject[]>([]);
   const [projectId, setProjectId] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<"idle" | "saved" | "error">("idle");
@@ -555,6 +563,31 @@ export default function Editor() {
   };
 
   /**
+   * Is the address actually serving a page? A recorded address isn't proof —
+   * a page can be taken down, or a host can still be building it.
+   */
+  const liveUrl = liveAddress?.url ?? null;
+  const reachable =
+    !liveUrl || checked?.url !== liveUrl ? "checking" : checked.online ? "online" : "offline";
+
+  useEffect(() => {
+    if (!liveUrl) return;
+    let cancelled = false;
+    fetch(`/api/check?url=${encodeURIComponent(liveUrl)}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (!cancelled) setChecked({ url: liveUrl, online: !!data?.online });
+      })
+      .catch(() => {
+        if (!cancelled) setChecked({ url: liveUrl, online: false });
+      });
+    return () => {
+      cancelled = true;
+    };
+    // Checked when the address changes, and again after an update lands.
+  }, [liveUrl, liveVersion]);
+
+  /**
    * Keep a site hosted here in step with what's on screen.
    *
    * Waits for a pause in the typing rather than firing on every keystroke, so a
@@ -567,7 +600,10 @@ export default function Editor() {
       setLiveStatus("saving");
       const ok = await updateLiveSite(liveId, exportHtml(site, { embedProject: true }));
       setLiveStatus(ok ? "saved" : "error");
-      if (ok) window.setTimeout(() => setLiveStatus("idle"), 2000);
+      if (ok) {
+        setLiveVersion((version) => version + 1);
+        window.setTimeout(() => setLiveStatus("idle"), 2000);
+      }
     }, 2500);
     return () => window.clearTimeout(timer);
   }, [site, liveId, loaded]);
@@ -589,8 +625,6 @@ export default function Editor() {
     }
   };
 
-  // The most recent place this site was published, shown in the corner.
-  const liveAddress = Object.values(site.published ?? {}).sort((a, b) => b.at - a.at)[0] ?? null;
 
   const goToPage = useCallback(
     (slug: string) => {
@@ -1014,9 +1048,21 @@ export default function Editor() {
               {liveAddress ? (
                 <>
                   <div className="flex items-center gap-1.5">
-                    <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
+                    <span
+                      className={`h-1.5 w-1.5 shrink-0 rounded-full ${
+                        reachable === "online"
+                          ? "bg-emerald-500"
+                          : reachable === "offline"
+                            ? "bg-rose-500"
+                            : "bg-slate-300"
+                      }`}
+                    />
                     <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-                      Live at
+                      {reachable === "online"
+                        ? "Online at"
+                        : reachable === "offline"
+                          ? "Not answering"
+                          : "Checking…"}
                     </span>
                     {liveId && liveStatus !== "idle" && (
                       <span

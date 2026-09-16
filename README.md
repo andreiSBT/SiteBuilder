@@ -299,6 +299,21 @@ to could overwrite your live page.
 Updates wait for a **pause in the typing** (2.5s) rather than firing per keystroke, so a
 sentence is one upload rather than forty. The corner shows "updating…" then "up to date".
 
+### It checks that the page is really there
+
+A recorded address isn't proof of anything — a page can be taken down, or a host can still
+be building it. So the corner asks before it claims: a green dot and **"Online at"** when
+the address answers, a red dot and **"Not answering"** when it doesn't, grey while it finds
+out. Checked when the address changes and again after each edit is uploaded.
+
+The browser can't ask another site directly (it won't answer a cross-origin request), so
+`/api/check` asks on its behalf and reports only the status code. Fetching a URL somebody
+else chose is a way to make a server knock on doors it shouldn't, so before anything is
+requested: http(s) only, the hostname is resolved and refused if it lands on a private,
+loopback or link-local address — including the cloud metadata address — and redirects
+aren't followed. This app's own host is allowed through by name, or pages hosted here would
+look dead during local development.
+
 ### If someone puts something bad up there
 
 Anyone who can reach the app can publish a page on your domain — that's the cost of "no
