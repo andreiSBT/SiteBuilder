@@ -224,6 +224,11 @@ Beyond the words, most of how a block *looks* is adjustable in the panel. Everyt
 defaults to how the site rendered before the control existed, so opening an old project
 changes nothing about it.
 
+A hovered button doesn't lift in the editor, only on the finished site. The 1px hover
+nudge moved it out from under the pointer, which ended the hover, which put it back — a
+button flickered on the spot, and a button that had been dragged somewhere flickered
+against its own handles.
+
 **Buttons** — four styles (solid, outline, soft tint, or just a link), corners (follow the
 theme, square, rounded, pill), three sizes, and three widths: as wide as the words, wide,
 or full width. The hero's button has the same style, corner and size controls of its own.
@@ -305,6 +310,36 @@ which rounds the boxes you can type into. A button's text is edited in place, so
 button *is* a `[data-edit]` — and `[data-edit]` and `.btn--pill` have exactly the same
 specificity, with that rule coming last. Every button in the preview was 3px, whatever it
 had been told. It's `[data-edit]:not(.btn)` now.
+
+### Links inside a paragraph
+
+Select a few words, press **🔗**, and they become a link — to a URL, an email address, or
+one of your own pages from the dropdown. Tick **Make it look like a button** and the same
+words come out as a small solid button sitting in the line of text. Putting the caret in an
+existing link fills the panel in, so you can retarget it, restyle it, or **Remove** it.
+
+This meant teaching `sanitizeRich()` about `<a>`, which is the one part of this app where a
+mistake is a security hole rather than a wonky margin. It takes `href` and nothing else,
+through a `safeHref()` that strips control characters *before* testing the scheme — so
+`java\nscript:alert(1)`, which browsers are perfectly happy to follow, is not a link. Only
+`http`, `https`, `mailto` and `tel` are allowed, alongside fragments and relative paths.
+The only class permitted is `link-btn`, from an allowlist of exactly one. Every `onclick`,
+every `data:` URL, and every attempt to close the attribute early ends up as plain words.
+
+`safeHref()` deliberately repeats a little of `normalizeUrl()` from `blocks.ts`. The
+sanitiser is the last line of defence and must not depend on a caller having tidied up
+first — and `blocks.ts` imports *this* file, so the dependency can only point one way.
+
+### Preview no longer jumps to the top
+
+Any change the frame didn't make itself replaces the whole preview document, and a fresh
+document starts at the top — so nudging a colour on a long page threw you back to the
+beginning of it. The frame reports its scroll position as it changes, the app keeps the
+last one, and `previewHtml()` takes it as an argument and scrolls there as the document
+loads. Switching pages still starts at the top, because that's a different page.
+
+The app can't simply read `contentWindow.scrollY`: the preview is sandboxed without
+`allow-same-origin`, which is the whole reason the editing engine lives inside it.
 
 ## Preview
 

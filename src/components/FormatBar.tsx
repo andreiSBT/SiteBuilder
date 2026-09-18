@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { FONT_OPTIONS } from "@/lib/blocks";
+import { FONT_OPTIONS, normalizeUrl } from "@/lib/blocks";
 import ColorPicker from "./ColorPicker";
 import Select from "./Select";
 import { Tip } from "./Tooltip";
@@ -19,13 +19,17 @@ export type SelectionState = {
   frame: { top: number; left: number };
   font: string;
   size: string;
+  /** The link the caret is inside, if it's inside one. */
+  link: { href: string; look: boolean } | null;
 };
 
 export type Command =
   | { type: "sb:cmd"; cmd: "exec"; value: string }
   | { type: "sb:cmd"; cmd: "font"; value: string }
   | { type: "sb:cmd"; cmd: "size"; value: string }
-  | { type: "sb:cmd"; cmd: "color"; value: string };
+  | { type: "sb:cmd"; cmd: "color"; value: string }
+  | { type: "sb:cmd"; cmd: "link"; value: { href: string; look: boolean } }
+  | { type: "sb:cmd"; cmd: "unlink" };
 
 /**
  * Floats above the words being edited.
@@ -42,15 +46,37 @@ export default function FormatBar({
   selection,
   inheritedFontLabel,
   inheritedSizeLabel,
+  pages,
   onCommand,
 }: {
   selection: SelectionState;
   inheritedFontLabel: string;
   inheritedSizeLabel: string;
+  /** This site's pages, so a link can point at one without typing a URL. */
+  pages: { name: string; slug: string }[];
   onCommand: (command: Command) => void;
 }) {
   const [color, setColor] = useState("#111827");
   const [showColor, setShowColor] = useState(false);
+  const [showLink, setShowLink] = useState(false);
+  const [href, setHref] = useState("");
+  const [look, setLook] = useState(false);
+
+  const existing = selection.link;
+
+  // Opening the panel on a link that already exists fills it in, so "make it a
+  // button" doesn't mean typing the address out again. Done here rather than in
+  // an effect: it's a thing that happens when you click, not a thing the two
+  // states have to be kept agreeing on.
+  const toggleLinkPanel = () => {
+    setShowLink((open) => {
+      if (!open) {
+        setHref(existing?.href ?? "");
+        setLook(existing?.look ?? false);
+      }
+      return !open;
+    });
+  };
 
   const exec = (value: string) => onCommand({ type: "sb:cmd", cmd: "exec", value });
   const nothingSelected = selection.collapsed;
@@ -67,6 +93,13 @@ export default function FormatBar({
     window.addEventListener("resize", measure);
     return () => window.removeEventListener("resize", measure);
   }, []);
+
+  const apply = () => {
+    const target = normalizeUrl(href.trim());
+    if (!target) return;
+    onCommand({ type: "sb:cmd", cmd: "link", value: { href: target, look } });
+    setShowLink(false);
+  };
 
   const wanted = {
     top: selection.frame.top + selection.rect.top - 46,
@@ -138,6 +171,19 @@ export default function FormatBar({
           </button>
         </Tip>
 
+        <Tip label={existing ? "Change this link" : "Turn the selected words into a link"}>
+          <button
+            type="button"
+            disabled={nothingSelected && !existing}
+            onClick={toggleLinkPanel}
+            className={`h-7 rounded px-1.5 text-xs transition hover:bg-slate-100 disabled:opacity-30 ${
+              existing ? "bg-indigo-50 text-indigo-700" : "text-slate-700"
+            }`}
+          >
+            🔗
+          </button>
+        </Tip>
+
         <span className="mx-0.5 h-5 w-px bg-slate-200" />
 
         <ToolButton
@@ -148,6 +194,76 @@ export default function FormatBar({
           <span className="text-[10px]">✕</span>
         </ToolButton>
       </div>
+
+      {showLink && (
+        <div className="mt-1 w-72 rounded-lg border border-slate-200 bg-white p-2 shadow-lg">
+          <label className="mb-1 block text-[11px] font-medium text-slate-600">
+            Where it goes
+          </label>
+          <input
+            autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="off"
+            spellCheck={false}
+            value={href}
+            placeholder="https://… or an email address"
+            onChange={(e) => setHref(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") apply();
+            }}
+            className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-xs outline-none focus:border-indigo-500"
+          />
+          {pages.length > 0 && (
+            <div className="mt-1.5">
+              <Select
+                value=""
+                ariaLabel="A page in this site"
+                options={[
+                  { value: "", label: "…or a page in this site" },
+                  ...pages.map((p) => ({ value: `#${p.slug}`, label: p.name })),
+                ]}
+                onChange={(value) => value && setHref(value)}
+              />
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={() => setLook((o) => !o)}
+            className="mt-2 flex w-full items-center gap-2 rounded px-1 py-1 text-[11px] text-slate-700 hover:bg-slate-50"
+          >
+            <span
+              className={`flex h-3.5 w-3.5 items-center justify-center rounded border text-[9px] ${
+                look ? "border-indigo-600 bg-indigo-600 text-white" : "border-slate-300"
+              }`}
+            >
+              {look ? "✓" : ""}
+            </span>
+            Make it look like a button
+          </button>
+          <div className="mt-2 flex gap-1.5">
+            <button
+              type="button"
+              disabled={!href.trim()}
+              onClick={apply}
+              className="flex-1 rounded bg-indigo-600 py-1 text-[11px] font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-40"
+            >
+              {existing ? "Update link" : "Make it a link"}
+            </button>
+            {existing && (
+              <button
+                type="button"
+                onClick={() => {
+                  onCommand({ type: "sb:cmd", cmd: "unlink" });
+                  setShowLink(false);
+                }}
+                className="rounded border border-slate-300 px-2 py-1 text-[11px] font-medium text-slate-600 hover:bg-slate-50"
+              >
+                Remove
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {showColor && (
         <div className="mt-1 w-56 rounded-lg border border-slate-200 bg-white p-2 shadow-lg">

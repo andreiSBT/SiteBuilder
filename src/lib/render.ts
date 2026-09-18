@@ -110,6 +110,19 @@ a { color: var(--accent); }
 .btn.btn--link { padding-inline: 0; }
 .btn.btn--link:hover { transform: none; }
 
+/* A few words inside a paragraph, made to look like a button. Padding is
+   tighter than a real .btn so it doesn't shove the lines apart. */
+.link-btn {
+  display: inline-block;
+  padding: 3px 14px;
+  border-radius: calc(var(--radius) * 0.7);
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+  text-decoration: none;
+}
+.link-btn:hover { opacity: .9; }
+
 .figure { margin: 0; }
 .figure img { display: block; width: 100%; height: auto; }
 .figure--rounded img { border-radius: var(--radius); }
@@ -390,8 +403,19 @@ ${interactive ? routingScript(site) : ""}${
 `;
 }
 
-/** The same document, showing one page, plus the editor's click-to-select wiring. */
-export function previewHtml(site: Site, pageId: string, selectedId: string | null): string {
+/**
+ * The same document, showing one page, plus the editor's click-to-select wiring.
+ *
+ * `scrollY` is where the frame was scrolled to when it was last replaced. The
+ * app can't read it — the preview is sandboxed, so `contentWindow.scrollY` is
+ * off limits — which is why the frame reports it and gets it handed back.
+ */
+export function previewHtml(
+  site: Site,
+  pageId: string,
+  selectedId: string | null,
+  scrollY = 0
+): string {
   const page = site.pages.find((p) => p.id === pageId) ?? site.pages[0];
   if (!page) return "<!doctype html><html><body></body></html>";
 
@@ -482,6 +506,14 @@ ${siteCss(site)}
 }
 .sb-bh--width { right: -7px; top: 50%; margin-top: -6px; cursor: ew-resize; }
 .sb-bh--size { right: -7px; bottom: -7px; cursor: nwse-resize; }
+/*
+ * In the editor a button is something you drag, not something you press. The
+ * hover lift moved it a pixel out from under the pointer, which took the hover
+ * away, which put it back — a button under the cursor flickered on the spot,
+ * and a button that had been dragged somewhere flickered against its handles.
+ */
+.btn { transition: none; }
+.btn:hover { transform: translate(var(--bx, 0px), var(--by, 0px)); }
 /* Text you can type straight into.
  *
  * The rounding is kept away from buttons: [data-edit] and .btn--pill have the
@@ -510,6 +542,37 @@ ${pageBlocks(page, site, true)}
 </main>
 ${inlineEditorScript()}${blockDragScript()}${boxHandlesScript()}<script>
 (function () {
+  /*
+   * Put the page back where it was.
+   *
+   * Every change the frame didn't make itself replaces this document, and a
+   * fresh document starts at the top — so changing a colour threw you back to
+   * the top of a long page. The app hands the old position back in and the
+   * frame reports every scroll, so the next rebuild knows where to land.
+   */
+  var startAt = ${Math.max(0, Math.round(scrollY)) || 0};
+  var moved = false;
+  if (startAt) window.scrollTo(0, startAt);
+  // Pictures arriving later change the height, so aim again once — unless the
+  // reader has by then scrolled somewhere of their own. Landing back where we
+  // put it doesn't count as them moving, or this would never fire.
+  window.addEventListener("load", function () {
+    if (startAt && !moved) window.scrollTo(0, startAt);
+  });
+
+  var timer = null;
+  window.addEventListener("scroll", function () {
+    if (Math.abs(window.scrollY - startAt) > 2) moved = true;
+    // Told on a timer rather than a frame: the app only needs the last value
+    // before the next rebuild, and a frame callback never comes in a window
+    // that isn't drawing.
+    if (timer) return;
+    timer = setTimeout(function () {
+      timer = null;
+      parent.postMessage({ type: "sb:scroll", y: window.scrollY }, "*");
+    }, 120);
+  });
+
   var selected = ${JSON.stringify(selectedId)};
   if (selected) {
     var el = document.querySelector('[data-block-id="' + CSS.escape(selected) + '"]');

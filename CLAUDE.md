@@ -91,6 +91,17 @@ instead of `title=""`, `Select` instead of `<select>`, `ColorPicker` instead of
 `<form>` elements, so validation bubbles can't appear. The file picker and the download
 flow are the only exceptions — an OS window can't be replaced.
 
+**`sanitizeRich()` allows `<a>`, and that is the sharpest edge in the codebase.** `href`
+only, through `safeHref()`, which strips control characters before testing the scheme
+(`java\nscript:` is a working link in a browser); `http`/`https`/`mailto`/`tel`, fragments
+and relative paths, nothing else. `class` is an allowlist of exactly one value,
+`link-btn`. If you touch it, re-run the attack cases in the README's link section.
+
+**The preview's scroll position lives in the app.** The frame reports it (`sb:scroll`) and
+`previewHtml()` takes it back as an argument, because a sandboxed frame's `scrollY` can't
+be read from outside. Anything that adds a new way to rebuild the document gets this for
+free; anything that bypasses `previewHtml()` loses it.
+
 **`migrate()` accepts anything** that was ever written to localStorage or a project file.
 If you change the `Site` shape, teach `migrate` the old shape too; old projects and old
 exported pages are still out there.

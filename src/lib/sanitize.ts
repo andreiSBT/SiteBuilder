@@ -23,6 +23,7 @@ const TAG_ALIASES: Record<string, string> = {
   p: "p",
   br: "br",
   span: "span",
+  a: "a",
   // Browsers love producing <div> inside contentEditable; treat it as a line.
   div: "p",
 };
@@ -80,8 +81,49 @@ function cleanStyle(rawStyle: string): string {
   return kept.join(";");
 }
 
+/**
+ * The one class a link in rich text may carry: the "looks like a button" style.
+ * An allowlist of exactly one is still an allowlist.
+ */
+const LINK_CLASSES = new Set(["link-btn"]);
+
+const SAFE_HREF_SCHEME = /^(https?|mailto|tel):/i;
+const HAS_SCHEME = /^[a-z][a-z0-9+.-]*:/i;
+
+/**
+ * A link target that can't run anything.
+ *
+ * This repeats a little of `normalizeUrl` in blocks.ts on purpose: blocks.ts
+ * imports this file, and the sanitiser is the last line of defence — it should
+ * not depend on a caller having cleaned up first. Returns null for anything it
+ * won't vouch for, and the tag is then dropped while its words stay.
+ */
+function safeHref(raw: string): string | null {
+  // Control characters and newlines first: "java\nscript:alert(1)" is a link
+  // the browser is perfectly happy to follow.
+  const href = raw.replace(/[\u0000-\u001f\u007f\s]+/g, "").trim();
+  if (!href) return null;
+  if (/^([#/]|\.\.?\/)/.test(href) || !HAS_SCHEME.test(href)) {
+    // A fragment, a path, or a bare name like "about.html".
+    return escapeAttr(href);
+  }
+  return SAFE_HREF_SCHEME.test(href) ? escapeAttr(href) : null;
+}
+
+/** Quotes and angle brackets can't be allowed to end the attribute early. */
+function escapeAttr(value: string): string {
+  return value
+    .replace(/&(?!(#\d+|#x[0-9a-f]+|[a-z][a-z0-9]*);)/gi, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
 const TAG_RE = /<\/?([a-z][a-z0-9]*)\b([^>]*)>/gi;
 const STYLE_ATTR_RE = /\bstyle\s*=\s*("([^"]*)"|'([^']*)')/i;
+const HREF_ATTR_RE = /\bhref\s*=\s*("([^"]*)"|'([^']*)'|([^\s>]+))/i;
+const CLASS_ATTR_RE = /\bclass\s*=\s*("([^"]*)"|'([^']*)')/i;
 
 /**
  * Sanitise a fragment of inline HTML. Returns well-formed HTML: stray closing
@@ -120,6 +162,21 @@ export function sanitizeRich(input: unknown): string {
       continue;
     }
 
+    if (tag === "a") {
+      const hrefMatch = HREF_ATTR_RE.exec(match[2]);
+      const href = hrefMatch
+        ? safeHref(hrefMatch[2] ?? hrefMatch[3] ?? hrefMatch[4] ?? "")
+        : null;
+      // A link that goes nowhere safe is not a link: drop it, keep the words.
+      if (!href) continue;
+      const classMatch = CLASS_ATTR_RE.exec(match[2]);
+      const wanted = (classMatch?.[2] ?? classMatch?.[3] ?? "").trim();
+      const cls = LINK_CLASSES.has(wanted) ? ` class="${wanted}"` : "";
+      out.push(`<a href="${href}"${cls}>`);
+      open.push("a");
+      continue;
+    }
+
     if (tag === "span") {
       const styleMatch = STYLE_ATTR_RE.exec(match[2]);
       const style = cleanStyle(styleMatch ? (styleMatch[2] ?? styleMatch[3] ?? "") : "");
@@ -142,7 +199,7 @@ export function sanitizeRich(input: unknown): string {
 
 /** True if a stored value is plain text from before rich text existed. */
 function looksPlain(value: string): boolean {
-  return !/<(\/?)(strong|b|em|i|u|s|span|p|br|div)\b/i.test(value);
+  return !/<(\/?)(strong|b|em|i|u|s|span|p|br|div|a)\b/i.test(value);
 }
 
 /**

@@ -114,6 +114,12 @@ export default function Editor() {
   const [selection, setSelection] = useState<SelectionState | null>(null);
   // Typing in the preview must not rebuild the document under the caret.
   const skipPreviewRebuild = useRef(false);
+  /**
+   * Where the preview is scrolled to, and which page that was. The frame tells
+   * us, because a sandboxed frame's scroll position can't be read from here.
+   */
+  const frameScroll = useRef(0);
+  const scrolledPage = useRef<string | null>(null);
   // True while a field inside the frame holds the caret. Counting renders to
   // skip "just one" rebuild was too delicate — a rebuild slipped through under
   // fast typing and swallowed the rest of the word. This can't slip.
@@ -207,6 +213,8 @@ export default function Editor() {
             ),
           })),
         }));
+      } else if (data?.type === "sb:scroll") {
+        if (typeof data.y === "number") frameScroll.current = data.y;
       } else if (data?.type === "sb:box") {
         // A button dragged, resized or rounded off on the page. The frame has
         // already moved the pixels; this is the value catching up.
@@ -602,7 +610,13 @@ export default function Editor() {
       return;
     }
     setSelection(null);
-    setPreviewDoc(previewHtml(site, activePage?.id ?? "", selectedId));
+    // A different page starts at the top; the same page carries on where it was.
+    const pageId = activePage?.id ?? "";
+    if (scrolledPage.current !== pageId) {
+      scrolledPage.current = pageId;
+      frameScroll.current = 0;
+    }
+    setPreviewDoc(previewHtml(site, pageId, selectedId, frameScroll.current));
     // selectedId deliberately isn't a dependency: selecting a block only moves
     // an outline, and rebuilding the document for that would drop the caret the
     // click just placed. The frame is told about it instead, below.
@@ -1149,6 +1163,7 @@ export default function Editor() {
                 !showPublish && (
                 <FormatBar
                   selection={selection}
+                  pages={site.pages.map((p) => ({ name: p.name, slug: p.slug }))}
                   inheritedFontLabel={`Theme font (${
                     FONT_OPTIONS.find((o) => o.value === site.theme.font)?.label ?? "Sans"
                   })`}

@@ -90,6 +90,16 @@ export function inlineEditorScript(): string {
     return "";
   }
 
+  /** The link the caret is inside, if any — so the bar can offer to change it. */
+  function linkAt(field, node) {
+    var walk = node && node.nodeType === 3 ? node.parentElement : node;
+    while (walk && walk !== field) {
+      if (walk.tagName === "A") return walk;
+      walk = walk.parentElement;
+    }
+    return null;
+  }
+
   function readFormatting(field, node) {
     var font = "";
     var size = "0";
@@ -129,7 +139,8 @@ export function inlineEditorScript(): string {
       collapsed: selection.isCollapsed,
       rect: { top: rect.top, left: rect.left, width: rect.width, height: rect.height },
       font: format.font,
-      size: format.size
+      size: format.size,
+      link: describeLink(linkAt(field, selection.focusNode))
     }, "*");
   }
 
@@ -209,6 +220,46 @@ export function inlineEditorScript(): string {
     var selection = document.getSelection();
     selection.removeAllRanges();
     selection.addRange(range);
+  }
+
+  function describeLink(el) {
+    if (!el) return null;
+    return { href: el.getAttribute("href") || "", look: el.getAttribute("class") === "link-btn" };
+  }
+
+  function setLook(el, look) {
+    if (look) el.setAttribute("class", "link-btn");
+    else el.removeAttribute("class");
+  }
+
+  /**
+   * Turn the selected words into a link, or retarget the one the caret is in.
+   *
+   * Any link already inside the selection is undone first: an <a> inside an <a>
+   * is not something a browser will keep, and the sanitiser would flatten it
+   * into something nobody asked for.
+   */
+  function applyLink(field, href, look) {
+    var selection = document.getSelection();
+    if (!liveRange(field)) {
+      var existing = linkAt(field, selection && selection.focusNode);
+      if (existing) {
+        existing.setAttribute("href", href);
+        setLook(existing, look);
+      }
+      return;
+    }
+    document.execCommand("unlink");
+    var range = liveRange(field);
+    if (!range) return;
+    var a = document.createElement("a");
+    a.setAttribute("href", href);
+    setLook(a, look);
+    a.appendChild(range.extractContents());
+    range.insertNode(a);
+    var after = document.createRange();
+    after.selectNodeContents(a);
+    reselect(after);
   }
 
   function wrapStyle(field, style) {
@@ -312,6 +363,10 @@ export function inlineEditorScript(): string {
       else wrapStyle(field, { fontSize: data.value + "px" });
     } else if (data.cmd === "color") {
       wrapStyle(field, { color: data.value });
+    } else if (data.cmd === "link") {
+      applyLink(field, data.value.href, !!data.value.look);
+    } else if (data.cmd === "unlink") {
+      document.execCommand("unlink");
     }
 
     report(field);
