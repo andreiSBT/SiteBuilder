@@ -204,6 +204,88 @@ export const TEMPLATES: Template[] = [
   },
 
   {
+    id: "practice",
+    name: "Formal",
+    tagline: "A firm, a practice, a professional body.",
+    build: () => ({
+      title: "Whitcombe & Hale",
+      theme: theme({
+        accent: "#1e3a5f",
+        bg: "#fcfbf8",
+        text: "#17191c",
+        muted: "#5b6471",
+        font: "garamond",
+        maxWidth: 720,
+        radius: 2,
+      }),
+      nav: true,
+      pages: [
+        page("Home", [
+          b("hero", {
+            heading: "Whitcombe & Hale",
+            subheading: "Solicitors \u00B7 Established 1928 \u00B7 Lincoln\u2019s Inn Fields, London",
+            buttonText: "Request a consultation",
+            buttonLink: "#contact",
+            style: "plain",
+            align: "center",
+          }),
+          b("text", {
+            text: "We advise private clients, trustees and closely held companies on matters that are rarely straightforward and seldom urgent in the way they first appear.\n\nMost of our work comes by recommendation. We take a small number of instructions and give each of them the attention it requires.",
+            align: "left",
+          }),
+          b("features", {
+            title: "Areas of practice",
+            items: [
+              { icon: "", title: "Private client", body: "Wills, trusts, estates and the administration that follows." },
+              { icon: "", title: "Corporate", body: "Shareholder agreements, succession, and the sale of family businesses." },
+              { icon: "", title: "Property", body: "Freehold and leasehold transactions, landed estates, and disputes arising from them." },
+            ],
+          }),
+          b("button", { text: "The firm", link: "#the-firm", variant: "outline", align: "center" }),
+        ]),
+
+        page("The firm", [
+          b("heading", { text: "The firm", align: "left" }),
+          b("text", {
+            text: "Whitcombe & Hale was founded in 1928 and has occupied the same building since 1954. There are eleven of us: four partners, five associates, and two who keep the rest of us in order.\n\nWe are regulated by the Solicitors Regulation Authority. Our terms of business are provided in writing before any work begins, and our fees are agreed in advance.",
+            align: "left",
+          }),
+          b("heading", { text: "How we work", align: "left" }),
+          b("text", {
+            text: "One partner takes responsibility for each matter and remains responsible for it throughout. Correspondence is answered within two working days. Where a matter falls outside our competence, we will say so and recommend someone better placed to help.",
+            align: "left",
+          }),
+        ]),
+
+        page("Contact", [
+          b("heading", { text: "Contact", align: "left" }),
+          b("text", {
+            text: "New enquiries are welcome by letter, telephone or email. Please do not send confidential material until we have confirmed that we are able to act.",
+            align: "left",
+          }),
+          b("text", {
+            text: "12 Lincoln\u2019s Inn Fields\nLondon WC2A 3BP\n\nTelephone 020 7946 0318\nenquiries@whitcombehale.example",
+            align: "left",
+          }),
+          b("button", {
+            text: "Email the firm",
+            link: "mailto:enquiries@whitcombehale.example",
+            variant: "solid",
+            align: "left",
+          }),
+          b("footer", {
+            text: "Whitcombe & Hale LLP is authorised and regulated by the Solicitors Regulation Authority.",
+            links: [
+              { label: "Terms of business", href: "#" },
+              { label: "Privacy notice", href: "#" },
+            ],
+          }),
+        ]),
+      ],
+    }),
+  },
+
+  {
     id: "article",
     name: "Article",
     tagline: "A blog post, essay, or write-up.",
