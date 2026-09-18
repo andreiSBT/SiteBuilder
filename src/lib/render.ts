@@ -7,6 +7,10 @@ import type { Page, Site } from "./types";
 export function siteCss(site: Site): string {
   const t = site.theme;
   const font = FONT_STACKS[t.font] ?? FONT_STACKS.system;
+  // Headings fall back to the body font, which is what "" means.
+  const headingFont = FONT_STACKS[t.headingFont] ?? font;
+  const pad = Math.min(80, Math.max(4, Number(t.spacing) || 28));
+  const leading = Math.min(260, Math.max(100, Number(t.lineHeight) || 160)) / 100;
   return `:root {
   --accent: ${t.accent};
   --bg: ${t.bg};
@@ -14,6 +18,8 @@ export function siteCss(site: Site): string {
   --muted: ${t.muted};
   --radius: ${t.radius}px;
   --width: ${t.maxWidth}px;
+  --pad: ${pad}px;
+  --heading-font: ${headingFont};
 }
 * { box-sizing: border-box; }
 body {
@@ -21,11 +27,11 @@ body {
   font-family: ${font};
   background: var(--bg);
   color: var(--text);
-  line-height: 1.6;
+  line-height: ${leading};
   -webkit-font-smoothing: antialiased;
 }
 main { max-width: var(--width); margin: 0 auto; padding: 0 24px; }
-.block { padding: 28px 0; }
+.block { padding: var(--pad) 0; }
 /*
  * A heading belongs to what comes after it. With the same padding as every
  * other block it sits marooned halfway between the two, and the page reads as
@@ -34,7 +40,7 @@ main { max-width: var(--width); margin: 0 auto; padding: 0 24px; }
 .block--heading { padding-bottom: 2px; }
 .block--heading > h2 { margin-bottom: 0; }
 
-h1, h2, h3, h4 { line-height: 1.2; margin: 0 0 12px; text-wrap: balance; }
+h1, h2, h3, h4 { font-family: var(--heading-font); line-height: 1.2; margin: 0 0 12px; text-wrap: balance; }
 h1 { font-size: clamp(32px, 6vw, 52px); letter-spacing: -0.02em; }
 h2 { font-size: clamp(24px, 4vw, 32px); letter-spacing: -0.01em; }
 h3 { font-size: 20px; }
@@ -51,6 +57,14 @@ a { color: var(--accent); }
   max-width: 34em;
   margin: 14px auto 0;
 }
+.hero__inner { width: 100%; }
+.hero--compact { padding: 32px 0 28px; }
+.hero--tall { padding: 96px 0 92px; }
+/*
+ * A hero told to fill the screen centres its contents vertically. The inner
+ * wrapper is what stops a flex column stretching the button to full width.
+ */
+.hero--screen { min-height: 78vh; display: flex; flex-direction: column; justify-content: center; }
 .hero--tint { background: color-mix(in srgb, var(--accent) 8%, transparent); border-radius: var(--radius); padding-inline: 32px; margin-top: 24px; }
 .hero--gradient { background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 18%, transparent), transparent 70%); border-radius: var(--radius); padding-inline: 32px; margin-top: 24px; }
 
@@ -68,6 +82,28 @@ a { color: var(--accent); }
 }
 .btn:hover { opacity: .9; transform: translateY(-1px); }
 .btn--outline { background: transparent; color: var(--accent); }
+.btn--soft {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--accent);
+  border-color: transparent;
+}
+.btn--link {
+  background: transparent;
+  border-color: transparent;
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.btn--square { border-radius: 0; }
+.btn--rounded { border-radius: 10px; }
+.btn--pill { border-radius: 999px; }
+.btn--small { padding: 8px 16px; font-size: 14px; }
+.btn--large { padding: 16px 32px; font-size: 18px; }
+.btn--wide { min-width: 260px; text-align: center; }
+.btn--full { display: block; width: 100%; text-align: center; }
+/* After the sizes, so a link-shaped button keeps its words flush with the text. */
+.btn.btn--link { padding-inline: 0; }
+.btn.btn--link:hover { transform: none; }
 
 .figure { margin: 0; }
 .figure img { display: block; width: 100%; height: auto; }
@@ -75,17 +111,37 @@ a { color: var(--accent); }
 figcaption { margin-top: 8px; font-size: 14px; color: var(--muted); text-align: center; }
 
 .grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+.grid--1 { grid-template-columns: 1fr; }
+.grid--2 { grid-template-columns: repeat(2, 1fr); }
+.grid--3 { grid-template-columns: repeat(3, 1fr); }
+.grid--4 { grid-template-columns: repeat(4, 1fr); }
 .card {
   padding: 20px;
   border: 1px solid color-mix(in srgb, var(--text) 12%, transparent);
   border-radius: var(--radius);
   background: color-mix(in srgb, var(--text) 3%, transparent);
 }
+.cards--outline .card { background: none; }
+.cards--shadow .card {
+  border-color: transparent;
+  background: var(--bg);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--text) 12%, transparent);
+}
+.cards--plain .card { border: 0; background: none; padding: 0; }
 .card__icon { font-size: 28px; margin-bottom: 8px; }
 .card h3 { margin-bottom: 6px; }
 .card p { margin: 0; color: var(--muted); font-size: 15px; }
 
-.spacer { width: 100%; }
+.spacer { width: 100%; display: flex; align-items: center; }
+.spacer--full::before,
+.spacer--short::before,
+.spacer--dots::before {
+  content: "";
+  flex: 1;
+  border-top: 1px solid color-mix(in srgb, var(--text) 16%, transparent);
+}
+.spacer--short::before { flex: 0 0 120px; margin: 0 auto; }
+.spacer--dots::before { border-top-style: dotted; border-top-width: 2px; }
 
 .site-footer {
   margin-top: 24px;
@@ -127,9 +183,15 @@ figcaption { margin-top: 8px; font-size: 14px; color: var(--muted); text-align: 
 .site-nav nav a:hover { color: var(--text); }
 .site-nav nav a[aria-current="page"] { color: var(--accent); border-bottom-color: var(--accent); }
 
+@media (max-width: 760px) {
+  /* Four across is unreadable on a phone whatever the page is told to do. */
+  .grid--3, .grid--4 { grid-template-columns: repeat(2, 1fr); }
+}
 @media (max-width: 600px) {
-  .block { padding: 22px 0; }
+  .block { padding: calc(var(--pad) * 0.8) 0; }
   .hero { padding: 40px 0 32px; }
+  .hero--screen { min-height: 70vh; }
+  .grid--2, .grid--3, .grid--4 { grid-template-columns: 1fr; }
   .nav-inner { padding: 10px 16px; gap: 12px; }
 }`;
 }

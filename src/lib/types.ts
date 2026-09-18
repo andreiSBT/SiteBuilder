@@ -22,8 +22,14 @@ export type Theme = {
   text: string;
   muted: string;
   font: string;
+  /** "" means headings use the same font as everything else. */
+  headingFont: string;
   maxWidth: number;
   radius: number;
+  /** How much air every block leaves around itself, in px. */
+  spacing: number;
+  /** Multiplier on the body line height, x100 — 160 is the old fixed 1.6. */
+  lineHeight: number;
 };
 
 export type Page = {

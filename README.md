@@ -218,6 +218,49 @@ Headings are always a real `<h2>`. There's no heading-level picker: the size sli
 covers how big it *looks*, and keeping the tag fixed means screen readers and search
 engines still see a proper heading.
 
+## What you can change
+
+Beyond the words, most of how a block *looks* is adjustable in the panel. Everything here
+defaults to how the site rendered before the control existed, so opening an old project
+changes nothing about it.
+
+**Buttons** — four styles (solid, outline, soft tint, or just a link), corners (follow the
+theme, square, rounded, pill), three sizes, and three widths: as wide as the words, wide,
+or full width. The hero's button has the same style, corner and size controls of its own.
+
+**Heroes** — compact, normal, tall, or fills the screen. The last one centres the contents
+vertically, which is why the hero wraps them in a `.hero__inner`: as direct flex children
+they'd be stretched to full width, and a button would silently become a banner.
+
+**Pictures** — a shape (as it comes, 16:9, 4:3, square, 3:4, 21:9), a width as a percentage
+of the page, and which side a narrow one sits on. Anything but "as it comes" crops with
+`object-fit: cover`, because a browser told only an aspect ratio squashes the picture
+instead of trimming it.
+
+**Feature grids** — one to four cards per row (two on a tablet, one on a phone, whatever
+it's told), the gap between them, text alignment, and four card styles: filled, outlined,
+raised, or no card at all.
+
+**Spacers** — still a gap, and now optionally a line across it: full width, a short rule in
+the middle, or dotted.
+
+**The whole site** — a separate font for headings, the air around every block, and line
+spacing, alongside the colours, body font, content width and corner roundness that were
+already there.
+
+Values are read through a `choice()` helper that falls back when a prop is missing or
+unrecognised, so a block saved before any of this existed renders exactly as it did, and a
+hand-edited project file can't produce a class that isn't in the stylesheet.
+
+### Claude edits don't undo any of it
+
+Claude is sent the page as words and returns it as words, so a block used to come back
+with none of the looks somebody had chosen — ask for a shorter headline and your pill
+buttons went back to being rectangles. `applyAiPage` now walks the old and new block lists
+together, matching on type, and keeps everything except the handful of props Claude was
+actually shown (`AI_OWNED` in `aiPage.ts`). Blocks keep their ids through an edit too, so
+whatever was selected stays selected.
+
 ## Preview
 
 **Preview** in the toolbar opens the finished site full-screen — the actual exported

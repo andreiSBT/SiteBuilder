@@ -42,8 +42,16 @@ const THEME_FIELDS: Field[] = [
   { key: "text", label: "Text colour", type: "color" },
   { key: "muted", label: "Muted text", type: "color" },
   { key: "font", label: "Font for the whole site", type: "select", options: FONT_OPTIONS },
+  {
+    key: "headingFont",
+    label: "Font for headings",
+    type: "select",
+    options: [{ value: "", label: "Same as the rest" }, ...FONT_OPTIONS],
+  },
   { key: "maxWidth", label: "Content width", type: "number", min: 520, max: 1100, step: 20 },
   { key: "radius", label: "Corner roundness", type: "number", min: 0, max: 28, step: 2 },
+  { key: "spacing", label: "Air around each block", type: "number", min: 8, max: 80, step: 2 },
+  { key: "lineHeight", label: "Line spacing (%)", type: "number", min: 110, max: 220, step: 5 },
 ];
 
 /** Write a value at "heading" or "items.0.title" without mutating anything. */

@@ -75,6 +75,39 @@ function edit(opts: RenderOpts | undefined, path: string, kind: "rich" | "plain"
   return ` data-edit="${esc(path)}" data-edit-kind="${kind}"`;
 }
 
+/**
+ * A named choice, falling back when the value is missing or unknown.
+ *
+ * Every one of these was added after sites already existed, so a block saved
+ * before the control existed has no value at all — and must keep rendering
+ * exactly as it did. The fallback is always "how it looked before".
+ */
+function choice(value: unknown, allowed: readonly string[], fallback: string): string {
+  const v = String(value ?? "");
+  return allowed.includes(v) ? v : fallback;
+}
+
+/** A class like "btn--pill", left out entirely when the choice is the default. */
+function modifier(base: string, value: string, skip: string): string {
+  return value === skip ? "" : ` ${base}--${value}`;
+}
+
+const SHAPE_FIELD = {
+  key: "shape",
+  label: "Corners",
+  type: "select" as const,
+  options: [
+    { value: "theme", label: "Follow the theme" },
+    { value: "square", label: "Square" },
+    { value: "rounded", label: "Rounded" },
+    { value: "pill", label: "Pill" },
+  ],
+};
+
+const SHAPES = ["theme", "square", "rounded", "pill"] as const;
+const SIZES = ["small", "medium", "large"] as const;
+const WIDTHS = ["auto", "wide", "full"] as const;
+
 const ALIGN_FIELD = {
   key: "align",
   label: "Alignment",
@@ -85,6 +118,30 @@ const ALIGN_FIELD = {
     { value: "right", label: "Right" },
   ],
 };
+
+/**
+ * The classes for one button. The hero has a button too, so this lives outside
+ * both blocks — a hero button takes the defaults and reads them from nothing.
+ */
+/** What each picture shape actually means, as a CSS aspect ratio. */
+const RATIOS: Record<string, string> = {
+  wide: "16 / 9",
+  photo: "4 / 3",
+  square: "1 / 1",
+  tall: "3 / 4",
+  banner: "21 / 9",
+};
+
+export function btnClass(p: BlockProps): string {
+  const variant = choice(p.variant, ["solid", "outline", "soft", "link"], "solid");
+  return (
+    "btn" +
+    modifier("btn", variant, "solid") +
+    modifier("btn", choice(p.shape, SHAPES, "theme"), "theme") +
+    modifier("btn", choice(p.size, SIZES, "medium"), "medium") +
+    modifier("btn", choice(p.width, WIDTHS, "auto"), "auto")
+  );
+}
 
 export const BLOCKS: Record<BlockType, BlockDef> = {
   hero: {
@@ -98,6 +155,49 @@ export const BLOCKS: Record<BlockType, BlockDef> = {
       SIZE_FIELD(200),
       { key: "buttonText", label: "Button text", type: "text" },
       { key: "buttonLink", label: "Button goes to", type: "pagelink" },
+      {
+        key: "buttonVariant",
+        label: "Button style",
+        type: "select",
+        options: [
+          { value: "solid", label: "Solid" },
+          { value: "outline", label: "Outline" },
+          { value: "soft", label: "Soft tint" },
+          { value: "link", label: "Just a link" },
+        ],
+      },
+      {
+        key: "buttonShape",
+        label: "Button corners",
+        type: "select",
+        options: [
+          { value: "theme", label: "Follow the theme" },
+          { value: "square", label: "Square" },
+          { value: "rounded", label: "Rounded" },
+          { value: "pill", label: "Pill" },
+        ],
+      },
+      {
+        key: "buttonSize",
+        label: "Button size",
+        type: "select",
+        options: [
+          { value: "small", label: "Small" },
+          { value: "medium", label: "Medium" },
+          { value: "large", label: "Large" },
+        ],
+      },
+      {
+        key: "height",
+        label: "How tall",
+        type: "select",
+        options: [
+          { value: "compact", label: "Compact" },
+          { value: "normal", label: "Normal" },
+          { value: "tall", label: "Tall" },
+          { value: "screen", label: "Fills the screen" },
+        ],
+      },
       {
         key: "style",
         label: "Background",
@@ -115,17 +215,32 @@ export const BLOCKS: Record<BlockType, BlockDef> = {
       subheading: "A short sentence that tells people what this site is about.",
       buttonText: "Get started",
       buttonLink: "#",
+      buttonVariant: "solid",
+      buttonShape: "theme",
+      buttonSize: "medium",
       size: 0,
+      height: "normal",
       style: "tint",
       align: "center",
     }),
     toHtml: (p, _theme, o) => {
+      const cls = btnClass({
+        variant: p.buttonVariant,
+        shape: p.buttonShape,
+        size: p.buttonSize,
+      });
       const button = p.buttonText
-        ? `\n      <a class="btn" href="${escUrl(p.buttonLink)}"${edit(o, "buttonText", "plain")}>${esc(p.buttonText)}</a>`
+        ? `\n        <a class="${cls}" href="${escUrl(p.buttonLink)}"${edit(o, "buttonText", "plain")}>${esc(p.buttonText)}</a>`
         : "";
-      return `<section class="block hero hero--${esc(p.style)}" style="text-align:${esc(p.align)}">
-      <h1 style="${sizeStyle(p.size, 14).slice(1)}"${edit(o, "heading")}>${richToHtml(p.heading)}</h1>
-      ${p.subheading || o?.edit ? `<p class="lead"${edit(o, "subheading")} data-placeholder="Add a subtitle…">${richToHtml(p.subheading)}</p>` : ""}${button}
+      const height = choice(p.height, ["compact", "normal", "tall", "screen"], "normal");
+      // The contents are wrapped because "fills the screen" centres them
+      // vertically, and a flex child would otherwise be stretched to the full
+      // width — which turns a button into a banner.
+      return `<section class="block hero hero--${esc(p.style)}${modifier("hero", height, "normal")}" style="text-align:${esc(p.align)}">
+      <div class="hero__inner">
+        <h1 style="${sizeStyle(p.size, 14).slice(1)}"${edit(o, "heading")}>${richToHtml(p.heading)}</h1>
+        ${p.subheading || o?.edit ? `<p class="lead"${edit(o, "subheading")} data-placeholder="Add a subtitle…">${richToHtml(p.subheading)}</p>` : ""}${button}
+      </div>
     </section>`;
     },
   },
@@ -181,19 +296,51 @@ export const BLOCKS: Record<BlockType, BlockDef> = {
         { value: "yes", label: "Yes" },
         { value: "no", label: "No" },
       ] },
+      {
+        key: "shape",
+        label: "Shape",
+        type: "select",
+        options: [
+          { value: "original", label: "However the picture comes" },
+          { value: "wide", label: "Wide (16:9)" },
+          { value: "photo", label: "Photo (4:3)" },
+          { value: "square", label: "Square" },
+          { value: "tall", label: "Tall (3:4)" },
+          { value: "banner", label: "Banner (21:9)" },
+        ],
+      },
+      { key: "width", label: "How wide (% of the page)", type: "number", min: 20, max: 100, step: 5 },
+      ALIGN_FIELD,
     ],
     defaults: () => ({
       src: "https://picsum.photos/1200/700",
       alt: "A placeholder photo",
       caption: "",
       rounded: "yes",
+      shape: "original",
+      width: 100,
+      align: "center",
     }),
-    toHtml: (p, _theme, o) => `<section class="block">
-      <figure class="figure${p.rounded === "yes" ? " figure--rounded" : ""}">
-        <img src="${escUrl(p.src)}" alt="${esc(p.alt)}" loading="lazy">
+    toHtml: (p, _theme, o) => {
+      const shape = choice(p.shape, ["original", "wide", "photo", "square", "tall", "banner"], "original");
+      // A cropped picture has to be told what to do with the overflow, or the
+      // browser squashes it instead of trimming it.
+      const crop = shape === "original" ? "" : ` style="aspect-ratio:${RATIOS[shape]};object-fit:cover;height:100%"`;
+      const w = Number(p.width);
+      const width = Number.isFinite(w) ? Math.min(100, Math.max(10, w)) : 100;
+      const align = choice(p.align, ["left", "center", "right"], "center");
+      // Narrower than the page? Then it needs to be told which side to sit on.
+      const place =
+        width >= 100
+          ? ""
+          : `;max-width:${width}%;margin-inline:${align === "left" ? "0 auto" : align === "right" ? "auto 0" : "auto"}`;
+      return `<section class="block">
+      <figure class="figure${p.rounded === "yes" ? " figure--rounded" : ""}" style="text-align:${esc(align)}${place}">
+        <img src="${escUrl(p.src)}" alt="${esc(p.alt)}" loading="lazy"${crop}>
         ${p.caption ? `<figcaption${edit(o, "caption", "plain")}>${esc(p.caption)}</figcaption>` : ""}
       </figure>
-    </section>`,
+    </section>`;
+    },
   },
 
   button: {
@@ -211,13 +358,44 @@ export const BLOCKS: Record<BlockType, BlockDef> = {
         options: [
           { value: "solid", label: "Solid" },
           { value: "outline", label: "Outline" },
+          { value: "soft", label: "Soft tint" },
+          { value: "link", label: "Just a link" },
+        ],
+      },
+      SHAPE_FIELD,
+      {
+        key: "size",
+        label: "Size",
+        type: "select",
+        options: [
+          { value: "small", label: "Small" },
+          { value: "medium", label: "Medium" },
+          { value: "large", label: "Large" },
+        ],
+      },
+      {
+        key: "width",
+        label: "Width",
+        type: "select",
+        options: [
+          { value: "auto", label: "As wide as the words" },
+          { value: "wide", label: "Wide" },
+          { value: "full", label: "Full width" },
         ],
       },
       ALIGN_FIELD,
     ],
-    defaults: () => ({ text: "Click me", link: "#", variant: "solid", align: "left" }),
+    defaults: () => ({
+      text: "Click me",
+      link: "#",
+      variant: "solid",
+      shape: "theme",
+      size: "medium",
+      width: "auto",
+      align: "left",
+    }),
     toHtml: (p, _theme, o) => `<section class="block" style="text-align:${esc(p.align)}">
-      <a class="btn${p.variant === "outline" ? " btn--outline" : ""}" href="${escUrl(p.link)}"${edit(o, "text", "plain")}>${esc(p.text)}</a>
+      <a class="${btnClass(p)}" href="${escUrl(p.link)}"${edit(o, "text", "plain")}>${esc(p.text)}</a>
     </section>`,
   },
 
@@ -240,9 +418,38 @@ export const BLOCKS: Record<BlockType, BlockDef> = {
         ],
         newItem: () => ({ icon: "✨", title: "New card", body: "Say something about it." }),
       },
+      {
+        key: "columns",
+        label: "Cards per row",
+        type: "select",
+        options: [
+          { value: "auto", label: "As many as fit" },
+          { value: "1", label: "One" },
+          { value: "2", label: "Two" },
+          { value: "3", label: "Three" },
+          { value: "4", label: "Four" },
+        ],
+      },
+      {
+        key: "cardStyle",
+        label: "Card style",
+        type: "select",
+        options: [
+          { value: "filled", label: "Filled" },
+          { value: "outline", label: "Outlined" },
+          { value: "shadow", label: "Raised" },
+          { value: "plain", label: "No card at all" },
+        ],
+      },
+      { key: "gap", label: "Space between cards (px)", type: "number", min: 0, max: 48, step: 4 },
+      ALIGN_FIELD,
     ],
     defaults: () => ({
       title: "Why it's good",
+      columns: "auto",
+      cardStyle: "filled",
+      gap: 16,
+      align: "left",
       items: [
         { icon: "⚡", title: "Fast", body: "Loads instantly, everywhere." },
         { icon: "🎨", title: "Pretty", body: "Looks good without any effort." },
@@ -260,9 +467,14 @@ export const BLOCKS: Record<BlockType, BlockDef> = {
         </div>`
         )
         .join("\n        ");
-      return `<section class="block">
+      const columns = choice(p.columns, ["auto", "1", "2", "3", "4"], "auto");
+      const style = choice(p.cardStyle, ["filled", "outline", "shadow", "plain"], "filled");
+      const g = Number(p.gap);
+      const gap = Number.isFinite(g) ? Math.min(48, Math.max(0, g)) : 16;
+      const align = choice(p.align, ["left", "center", "right"], "left");
+      return `<section class="block cards--${esc(style)}" style="text-align:${esc(align)}">
       ${p.title ? `<h2>${esc(p.title)}</h2>` : ""}
-      <div class="grid">
+      <div class="grid${modifier("grid", columns, "auto")}" style="gap:${gap}px">
         ${cards}
       </div>
     </section>`;
@@ -286,12 +498,24 @@ export const BLOCKS: Record<BlockType, BlockDef> = {
         max: 300,
         step: 4,
       },
+      {
+        key: "line",
+        label: "A line across the gap",
+        type: "select",
+        options: [
+          { value: "none", label: "Nothing, just space" },
+          { value: "full", label: "All the way across" },
+          { value: "short", label: "A short rule in the middle" },
+          { value: "dots", label: "Dotted" },
+        ],
+      },
     ],
-    defaults: () => ({ height: 24 }),
+    defaults: () => ({ height: 24, line: "none" }),
     toHtml: (p) => {
       const h = Number(p.height);
       const height = Number.isFinite(h) ? Math.min(300, Math.max(0, h)) : 48;
-      return `<div class="spacer" style="height:${height}px"></div>`;
+      const line = choice(p.line, ["none", "full", "short", "dots"], "none");
+      return `<div class="spacer${modifier("spacer", line, "none")}" style="height:${height}px"></div>`;
     },
   },
 
@@ -356,8 +580,13 @@ export const DEFAULT_THEME: Theme = {
   text: "#111827",
   muted: "#6b7280",
   font: "system",
+  headingFont: "",
   maxWidth: 760,
   radius: 12,
+  // The numbers the site had baked in before any of this was adjustable, so a
+  // project made then looks identical now.
+  spacing: 28,
+  lineHeight: 160,
 };
 
 export const FONT_STACKS: Record<string, string> = {

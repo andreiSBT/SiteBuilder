@@ -154,16 +154,46 @@ export function siteToAiPage(site: Site, pageId: string): AiPage {
   } as AiPage;
 }
 
+/**
+ * The props Claude is shown, and therefore the only ones it can change. Every
+ * other prop — shape, size, width, columns, card style, where a button goes —
+ * belongs to whoever set it in the panel.
+ */
+const AI_OWNED = ["heading", "subheading", "text", "buttonText", "title", "alt", "caption", "items"];
+
+/**
+ * Pair each revised block with the one it came from.
+ *
+ * Claude is sent the page as words and returns it as words, so a block comes
+ * back without any of the looks somebody chose for it. Walking the two lists
+ * together and matching on type finds the block each answer is really about;
+ * an inserted or deleted block just means the ones after it pair up one along.
+ */
+function keepLooks(before: Block[], after: Block[]): Block[] {
+  const unused = [...before];
+  return after.map((block) => {
+    const at = unused.findIndex((b) => b.type === block.type);
+    if (at === -1) return block;
+    const [original] = unused.splice(at, 1);
+    const words: Record<string, unknown> = {};
+    for (const key of AI_OWNED) {
+      if (key in block.props) words[key] = block.props[key];
+    }
+    // The id comes along too, so the block stays selected through an edit.
+    return { ...original, props: { ...original.props, ...words } };
+  });
+}
+
 /** Put a revised page back, keeping everything the change wasn't about. */
 export function applyAiPage(site: Site, pageId: string, revised: AiPage): Site {
   const rebuilt = aiPageToSite(revised);
+  const current = site.pages.find((p) => p.id === pageId)?.blocks ?? [];
+  const blocks = keepLooks(current, rebuilt.pages[0].blocks);
   return {
     ...site,
     title: rebuilt.title,
     theme: { ...site.theme, accent: rebuilt.theme.accent, font: rebuilt.theme.font },
-    pages: site.pages.map((page) =>
-      page.id === pageId ? { ...page, blocks: rebuilt.pages[0].blocks } : page
-    ),
+    pages: site.pages.map((page) => (page.id === pageId ? { ...page, blocks } : page)),
   };
 }
 
