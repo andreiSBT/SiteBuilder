@@ -1,4 +1,5 @@
 import { BLOCKS, FONT_STACKS, esc } from "./blocks";
+import { boxHandlesScript } from "./boxHandles";
 import { blockDragScript } from "./dragBlocks";
 import { inlineEditorScript } from "./inlineEditor";
 import type { Page, Site } from "./types";
@@ -80,7 +81,11 @@ a { color: var(--accent); }
   border: 2px solid var(--accent);
   transition: opacity .15s ease, transform .15s ease;
 }
-.btn:hover { opacity: .9; transform: translateY(-1px); }
+/* The nudge lives in --bx / --by so the hover lift can add to it rather than
+   replace it: a transform written inline would lose to this rule the moment
+   the pointer arrived. */
+.btn { transform: translate(var(--bx, 0px), var(--by, 0px)); }
+.btn:hover { opacity: .9; transform: translate(var(--bx, 0px), calc(var(--by, 0px) - 1px)); }
 .btn--outline { background: transparent; color: var(--accent); }
 .btn--soft {
   background: color-mix(in srgb, var(--accent) 14%, transparent);
@@ -438,8 +443,53 @@ ${siteCss(site)}
   z-index: 10;
 }
 .sb-dropline[hidden] { display: none; }
-/* Text you can type straight into. */
-[data-edit] { cursor: text; border-radius: 3px; }
+/* The box around a selected button: drag it anywhere, to any size. The frame
+   is see-through to the pointer so the words underneath stay editable; only
+   the handles themselves catch it. */
+.sb-box { position: absolute; z-index: 8; pointer-events: none; }
+.sb-box[hidden] { display: none; }
+.sb-box::before {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border: 1px dashed color-mix(in srgb, var(--accent) 60%, transparent);
+  border-radius: 4px;
+}
+.sb-bh {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  background: #fff;
+  border: 2px solid var(--accent);
+  border-radius: 3px;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.3);
+  pointer-events: auto;
+  touch-action: none;
+}
+.sb-bh--move {
+  left: -20px;
+  top: 50%;
+  margin-top: -7px;
+  border-radius: 50%;
+  cursor: move;
+}
+.sb-bh--radius {
+  right: -7px;
+  top: -7px;
+  background: var(--accent);
+  border-radius: 50%;
+  cursor: nesw-resize;
+}
+.sb-bh--width { right: -7px; top: 50%; margin-top: -6px; cursor: ew-resize; }
+.sb-bh--size { right: -7px; bottom: -7px; cursor: nwse-resize; }
+/* Text you can type straight into.
+ *
+ * The rounding is kept away from buttons: [data-edit] and .btn--pill have the
+ * same specificity and this rule comes later, so a button's own corners lost
+ * to it — you could pick Pill or Square, watch the preview ignore you, and
+ * only find out it had worked when you exported the page. */
+[data-edit] { cursor: text; }
+[data-edit]:not(.btn) { border-radius: 3px; }
 [data-edit]:hover { box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 22%, transparent); }
 [data-edit]:empty::before {
   content: attr(data-placeholder);
@@ -458,7 +508,7 @@ ${navHtml(site, page.slug)}<main>
 ${pageBlocks(page, site, true)}
     </section>
 </main>
-${inlineEditorScript()}${blockDragScript()}<script>
+${inlineEditorScript()}${blockDragScript()}${boxHandlesScript()}<script>
 (function () {
   var selected = ${JSON.stringify(selectedId)};
   if (selected) {

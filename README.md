@@ -227,6 +227,8 @@ changes nothing about it.
 **Buttons** — four styles (solid, outline, soft tint, or just a link), corners (follow the
 theme, square, rounded, pill), three sizes, and three widths: as wide as the words, wide,
 or full width. The hero's button has the same style, corner and size controls of its own.
+Beyond those presets, a button can be **put anywhere and made any size by hand** — see
+below.
 
 **Heroes** — compact, normal, tall, or fills the screen. The last one centres the contents
 vertically, which is why the hero wraps them in a `.hero__inner`: as direct flex children
@@ -260,6 +262,49 @@ buttons went back to being rectangles. `applyAiPage` now walks the old and new b
 together, matching on type, and keeps everything except the handful of props Claude was
 actually shown (`AI_OWNED` in `aiPage.ts`). Blocks keep their ids through an edit too, so
 whatever was selected stays selected.
+
+### Moving and sizing a button on the page
+
+Select a button and it gets a box with four handles: **move** (the circle on its left),
+**corners** (the filled circle at the top right), **width** (the right edge) and **width
+and height together** (the bottom right corner). Drag them. Arrow keys nudge the selected
+button a pixel at a time, or ten with Shift held.
+
+The five numbers behind those handles — `x`, `y`, `w`, `h`, `r` — are ordinary block props,
+all meaning "leave it alone" at 0, and they appear in the panel as sliders too, so you can
+drag roughly and then type the exact number. The hero's button has the same five under
+`buttonX`, `buttonW` and so on; `boxKey()` in `blocks.ts` is what maps between them.
+
+It works the way everything else in the preview does. The handles live *inside* the frame
+(`src/lib/boxHandles.ts`), because the frame is sandboxed and the app cannot measure
+anything in it. While the pointer is down that script moves the pixels itself, so the drag
+never waits for a round trip, and it posts `sb:box` messages the app folds into the real
+props. It brackets the whole drag with `sb:dragging`, which is the existing signal that
+stops the app replacing the document — otherwise the first mousemove would delete the very
+handle being held.
+
+Two details that took a try to get right:
+
+- **The nudge rides on `--bx` / `--by`, not `transform` directly.** `.btn:hover` lifts a
+  button by a pixel, and a transform written inline lost to that rule the instant the
+  pointer arrived — so a button you had just dragged jumped back under the cursor.
+- **Snapping is what makes it usable.** A free drag can't hit "centred", and can never
+  quite get back to zero. The move handle lines up with the column's left edge, centre and
+  right edge, and with the button's own starting point, whenever it comes within 7px.
+
+### The corners bug this turned up
+
+Picking Square or Pill did nothing *in the editor* — and worked perfectly in the exported
+file, which is a maddening way to find a bug. The preview's own stylesheet ends with
+
+```css
+[data-edit] { cursor: text; border-radius: 3px; }
+```
+
+which rounds the boxes you can type into. A button's text is edited in place, so the
+button *is* a `[data-edit]` — and `[data-edit]` and `.btn--pill` have exactly the same
+specificity, with that rule coming last. Every button in the preview was 3px, whatever it
+had been told. It's `[data-edit]:not(.btn)` now.
 
 ## Preview
 

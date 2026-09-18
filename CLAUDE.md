@@ -53,6 +53,8 @@ src/lib/site.ts       migrate, slugs, ids, projectFromHtml
 src/lib/templates.ts  the start-screen templates
 src/components/Editor.tsx   the whole app — state lives here
 src/lib/inlineEditor.ts     runs *inside* the preview iframe, never in an export
+src/lib/dragBlocks.ts       ditto — dragging blocks up and down the page
+src/lib/boxHandles.ts       ditto — dragging a button anywhere, to any size
 src/app/api/…         ai/, publish/, site/, check/
 ```
 
@@ -72,8 +74,16 @@ throws the caret to the start. Edits arriving from the frame skip exactly one re
 selecting a block moves the outline by `postMessage` rather than re-rendering.
 
 **The preview is sandboxed and the app cannot reach into it.** The two halves talk by
-`postMessage`: `sb:edit` and `sb:sel` come out, `sb:cmd` goes in. `allow-popups` and
-`allow-modals` are deliberately not granted.
+`postMessage`: `sb:edit`, `sb:sel`, `sb:move` and `sb:box` come out, `sb:cmd` goes in.
+`allow-popups` and `allow-modals` are deliberately not granted. Anything that drags must
+bracket itself with `sb:dragging`, or the app will replace the document mid-drag and take
+away the handle the pointer is holding.
+
+**The preview's editor-only CSS comes after the site's own.** `[data-edit]` matches real
+site elements — a button's text is edited in place, so the button *is* `[data-edit]` — and
+at equal specificity the later rule wins. A preview-only rule that sets a visual property
+(not just a cursor or an outline) must exclude what it would otherwise silently override;
+this cost a bug where button corners worked in the export but never in the editor.
 
 **Nothing uses browser-native UI.** `useDialog()` instead of `alert`/`confirm`, `<Tip>`
 instead of `title=""`, `Select` instead of `<select>`, `ColorPicker` instead of

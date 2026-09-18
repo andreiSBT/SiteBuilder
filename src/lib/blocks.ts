@@ -1,5 +1,5 @@
 import { richToHtml } from "./sanitize";
-import type { BlockDef, BlockProps, BlockType, RenderOpts, Theme } from "./types";
+import type { BlockDef, BlockProps, BlockType, Field, RenderOpts, Theme } from "./types";
 
 /** Escape untrusted text before putting it into HTML. */
 export function esc(value: unknown): string {
@@ -120,6 +120,108 @@ const ALIGN_FIELD = {
 };
 
 /**
+ * Position, size and corners set by dragging the button around the page.
+ *
+ * Five numbers, all of which mean "leave it alone" at 0: an exact width and
+ * height, a nudge across and down, and a corner radius that beats the shape
+ * preset. The hero has a button too, so the same five live there under
+ * `buttonX`, `buttonW` and so on — hence the prefix.
+ */
+export const BOX_KEYS = ["x", "y", "w", "h", "r"] as const;
+
+export type BoxKey = (typeof BOX_KEYS)[number];
+
+const BOX_LIMITS: Record<BoxKey, [number, number]> = {
+  x: [-600, 600],
+  y: [-400, 400],
+  w: [0, 1200],
+  h: [0, 400],
+  r: [0, 400],
+};
+
+/** Where one of those five numbers lives on a block: "w", or "buttonW". */
+export function boxKey(prefix: string, key: BoxKey): string {
+  return prefix ? prefix + key.toUpperCase() : key;
+}
+
+function boxNumber(value: unknown, key: BoxKey): number {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 0;
+  const [lo, hi] = BOX_LIMITS[key];
+  return Math.round(Math.min(hi, Math.max(lo, n)));
+}
+
+/** Write a dragged box back onto a block's props, ignoring anything odd. */
+export function applyBox(
+  props: BlockProps,
+  prefix: string,
+  patch: Record<string, unknown>
+): BlockProps {
+  const next = { ...props };
+  for (const key of BOX_KEYS) {
+    if (patch[key] === undefined) continue;
+    next[boxKey(prefix, key)] = boxNumber(patch[key], key);
+  }
+  return next;
+}
+
+/**
+ * The inline style for a hand-placed button.
+ *
+ * The offset goes through custom properties rather than `transform` directly,
+ * because `.btn:hover` lifts the button by a pixel — a transform written here
+ * would be replaced by that one the moment the pointer arrived.
+ */
+function boxStyle(p: BlockProps, prefix: string): string {
+  const at = (key: BoxKey) => boxNumber(p[boxKey(prefix, key)], key);
+  const w = at("w");
+  const h = at("h");
+  const x = at("x");
+  const y = at("y");
+  const r = at("r");
+  let style = "";
+  if (w > 0) style += `;width:${w}px;text-align:center`;
+  // A fixed height only holds the words in the middle if the box is a flex one.
+  if (h > 0) style += `;height:${h}px;display:inline-flex;align-items:center;justify-content:center`;
+  if (x) style += `;--bx:${x}px`;
+  if (y) style += `;--by:${y}px`;
+  if (r > 0) style += `;border-radius:${r}px`;
+  return style;
+}
+
+/** The five drag-me-anywhere fields, so the panel and the page stay in step. */
+function boxFields(prefix: string): Field[] {
+  const key = (k: BoxKey) => boxKey(prefix, k);
+  return [
+    { key: key("r"), label: "Corner roundness (0 = use the shape)", type: "number", min: 0, max: 400, step: 1 },
+    { key: key("w"), label: "Exact width (0 = automatic)", type: "number", min: 0, max: 1200, step: 5 },
+    { key: key("h"), label: "Exact height (0 = automatic)", type: "number", min: 0, max: 400, step: 5 },
+    { key: key("x"), label: "Nudge across", type: "number", min: -600, max: 600, step: 1 },
+    { key: key("y"), label: "Nudge down", type: "number", min: -400, max: 400, step: 1 },
+  ];
+}
+
+/** Every box number starts at 0, meaning "however it would look anyway". */
+function boxDefaults(prefix: string): BlockProps {
+  const out: BlockProps = {};
+  for (const key of BOX_KEYS) out[boxKey(prefix, key)] = 0;
+  return out;
+}
+
+/**
+ * What gets written onto the button itself: the hand-set box, plus — in the
+ * editor only — the marker the drag handles look for. `data-box` carries the
+ * prefix, so the handles know whether they're moving a button block or the one
+ * inside a hero.
+ */
+function boxAttrs(p: BlockProps, prefix: string, o?: RenderOpts): string {
+  const style = boxStyle(p, prefix);
+  return (
+    (style ? ` style="${style.slice(1)}"` : "") + (o?.edit ? ` data-box="${esc(prefix)}"` : "")
+  );
+}
+
+/**
  * The classes for one button. The hero has a button too, so this lives outside
  * both blocks — a hero button takes the defaults and reads them from nothing.
  */
@@ -187,6 +289,7 @@ export const BLOCKS: Record<BlockType, BlockDef> = {
           { value: "large", label: "Large" },
         ],
       },
+      ...boxFields("button"),
       {
         key: "height",
         label: "How tall",
@@ -218,6 +321,7 @@ export const BLOCKS: Record<BlockType, BlockDef> = {
       buttonVariant: "solid",
       buttonShape: "theme",
       buttonSize: "medium",
+      ...boxDefaults("button"),
       size: 0,
       height: "normal",
       style: "tint",
@@ -230,7 +334,7 @@ export const BLOCKS: Record<BlockType, BlockDef> = {
         size: p.buttonSize,
       });
       const button = p.buttonText
-        ? `\n        <a class="${cls}" href="${escUrl(p.buttonLink)}"${edit(o, "buttonText", "plain")}>${esc(p.buttonText)}</a>`
+        ? `\n        <a class="${cls}" href="${escUrl(p.buttonLink)}"${boxAttrs(p, "button", o)}${edit(o, "buttonText", "plain")}>${esc(p.buttonText)}</a>`
         : "";
       const height = choice(p.height, ["compact", "normal", "tall", "screen"], "normal");
       // The contents are wrapped because "fills the screen" centres them
@@ -375,7 +479,7 @@ export const BLOCKS: Record<BlockType, BlockDef> = {
       },
       {
         key: "width",
-        label: "Width",
+        label: "Stretch",
         type: "select",
         options: [
           { value: "auto", label: "As wide as the words" },
@@ -384,6 +488,7 @@ export const BLOCKS: Record<BlockType, BlockDef> = {
         ],
       },
       ALIGN_FIELD,
+      ...boxFields(""),
     ],
     defaults: () => ({
       text: "Click me",
@@ -393,9 +498,10 @@ export const BLOCKS: Record<BlockType, BlockDef> = {
       size: "medium",
       width: "auto",
       align: "left",
+      ...boxDefaults(""),
     }),
     toHtml: (p, _theme, o) => `<section class="block" style="text-align:${esc(p.align)}">
-      <a class="${btnClass(p)}" href="${escUrl(p.link)}"${edit(o, "text", "plain")}>${esc(p.text)}</a>
+      <a class="${btnClass(p)}" href="${escUrl(p.link)}"${boxAttrs(p, "", o)}${edit(o, "text", "plain")}>${esc(p.text)}</a>
     </section>`,
   },
 

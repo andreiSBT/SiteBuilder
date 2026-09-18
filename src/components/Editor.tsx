@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { BLOCKS, BLOCK_ORDER, FONT_OPTIONS, newBlock } from "@/lib/blocks";
+import { BLOCKS, BLOCK_ORDER, FONT_OPTIONS, applyBox, newBlock } from "@/lib/blocks";
 import { exportHtml, previewHtml } from "@/lib/render";
 import { copyText } from "@/lib/clipboard";
 import { canShareByLink, encodeSiteLink } from "@/lib/shareLink";
@@ -204,6 +204,23 @@ export default function Editor() {
             ...page,
             blocks: page.blocks.map((b) =>
               b.id === block ? { ...b, props: setByPath(b.props, path, clean) } : b
+            ),
+          })),
+        }));
+      } else if (data?.type === "sb:box") {
+        // A button dragged, resized or rounded off on the page. The frame has
+        // already moved the pixels; this is the value catching up.
+        const { block, prefix, patch } = data;
+        if (typeof block !== "string" || !patch || typeof patch !== "object") return;
+        skipPreviewRebuild.current = true;
+        setSite((s) => ({
+          ...s,
+          pages: s.pages.map((page) => ({
+            ...page,
+            blocks: page.blocks.map((b) =>
+              b.id === block
+                ? { ...b, props: applyBox(b.props, String(prefix ?? ""), patch) }
+                : b
             ),
           })),
         }));
